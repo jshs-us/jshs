@@ -23,31 +23,23 @@
   box-shadow:0 1px 3px rgba(9,31,98,.08),0 12px 32px rgba(9,31,98,.06);
   border:1px solid var(--line);
 }
-#gwauri-board .gb-header{
-  background:linear-gradient(155deg,var(--navy) 0%,var(--navy-deep) 100%);
-  padding:36px 38px 30px;position:relative;overflow:hidden;
+.board-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px;}
+#gb-userbar{flex-shrink:0;}
+.gb-who{font-size:14px;color:var(--muted);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.gb-who b{color:var(--ink);}
+.btn-userbar{
+  font-family:var(--ff);cursor:pointer;border-radius:9px;padding:8px 14px;
+  font-size:13px;font-weight:700;transition:.15s;
+  background:#fff;color:var(--navy);border:1px solid var(--line);
+  text-decoration:none;display:inline-block;
 }
-#gwauri-board .gb-header::after{
-  content:"";position:absolute;right:-60px;top:-60px;
-  width:280px;height:280px;border-radius:50%;
-  background:radial-gradient(circle,rgba(255,236,0,.14),transparent 70%);
-}
-#gwauri-board .gb-header-row{display:flex;align-items:center;justify-content:space-between;gap:18px;position:relative;z-index:1;}
-#gwauri-board .gb-brand{display:flex;align-items:center;gap:18px;}
-#gwauri-board .gb-logo-badge{width:64px;height:64px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.18);}
-#gwauri-board .gb-logo-badge span{font-size:32px;}
-#gwauri-board .gb-brand-text h2{margin:0;font-size:28px;color:#fff;letter-spacing:-.01em;}
-#gwauri-board .gb-brand-text p{margin:5px 0 0;font-size:16px;color:rgba(255,255,255,.62);}
+.btn-userbar:hover{border-color:var(--navy);}
 #gwauri-board button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:14px 24px;font-size:17px;font-weight:600;transition:transform .12s,opacity .15s,background .15s,border-color .15s;}
 #gwauri-board button:active{transform:scale(.97);}
 #gwauri-board .btn-primary{background:var(--yellow);color:var(--navy-deep);}
 #gwauri-board .btn-primary:hover{filter:brightness(.96);}
-#gwauri-board .btn-outline-light{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.35);}
-#gwauri-board .btn-outline-light:hover{background:rgba(255,255,255,.18);}
 #gwauri-board .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);}
 #gwauri-board .btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
-#gwauri-board .gb-who{font-size:16px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:14px;}
-#gwauri-board .gb-who b{color:#fff;}
 #gwauri-board .gb-body{padding:30px 36px 38px;}
 #gwauri-board input,#gwauri-board textarea{font-family:inherit;width:100%;border:1.5px solid var(--line);border-radius:10px;padding:15px 17px;font-size:17px;background:#fbfcfe;color:var(--ink);}
 #gwauri-board input:focus,#gwauri-board textarea:focus{outline:none;border-color:var(--navy);background:#fff;}
@@ -128,11 +120,9 @@
 #gwauri-board .post-admin-actions{display:flex;gap:8px;margin-top:10px;}
 
 @media(max-width:600px){
-  #gwauri-board .gb-header{padding:20px 18px;}
   #gwauri-board .gb-body{padding:18px 14px 24px;}
-  #gwauri-board .gb-brand-text h2{font-size:20px;}
-  #gwauri-board .gb-logo-badge{width:46px;height:46px;}
   .board-wrap{padding:18px 12px 40px;}
+  .board-head-row{margin-bottom:18px;}
 }
 </style>
 </head>
@@ -144,19 +134,15 @@
     <span>자유게시판</span>
   </div>
 
-  <div id="gwauri-board">
-    <div class="gb-header">
-      <div class="gb-header-row">
-        <div class="gb-brand">
-          <div class="gb-logo-badge"><img src="logo.png" alt="전남과학고 로고" style="width:48px;height:48px;object-fit:contain;border-radius:50%;"/></div>
-          <div class="gb-brand-text">
-            <h2>과학구리 게시판</h2>
-            <p>누구나 로그인 후 글을 남길 수 있어요</p>
-          </div>
-        </div>
-        <div id="gb-userbar"></div>
-      </div>
+  <div class="board-head-row">
+    <div>
+      <h1 class="bw-page-title" style="margin-bottom:4px;">💬 과학구리 게시판</h1>
+      <p class="bw-page-sub" style="margin-bottom:0;">누구나 로그인 후 글을 남길 수 있어요</p>
     </div>
+    <div id="gb-userbar"></div>
+  </div>
+
+  <div id="gwauri-board">
     <div class="gb-body">
       <div id="gb-app"></div>
     </div>
@@ -198,34 +184,15 @@ function isImgUrl(url,name){const c=(name||url||"").toLowerCase();return/\.(png|
 function renderUserbar(){
   if(S.user){
     const rl=S.role==="admin"?" · 관리자":S.role==="manager"?" · 매니저":"";
-    const mb=(S.role==="admin"||S.role==="manager")?`<button class="btn-outline-light" id="gb-manage-btn">관리</button>`:"";
-    userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><button class="btn-outline-light" id="gb-mypage-btn">마이페이지</button>${mb}</div>`;
-    document.getElementById("gb-mypage-btn").onclick=()=>{S.view="mypage";render();};
+    const mb=(S.role==="admin"||S.role==="manager")?`<button class="btn-userbar" id="gb-manage-btn">관리</button>`:"";
+    userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><a class="btn-userbar" href="mypage.html">마이페이지</a>${mb}</div>`;
     const mgb=document.getElementById("gb-manage-btn");if(mgb)mgb.onclick=()=>{S.view="manage";render();};
   }else{
     userbar.innerHTML="";
   }
 }
-function render(){renderUserbar();if(S.view==="mypage")return rMyPage();if(S.view==="manage")return rManage();if(S.view==="write")return rWrite();if(S.view==="detail")return rDetail();return rList();}
+function render(){renderUserbar();if(S.view==="manage")return rManage();if(S.view==="write")return rWrite();if(S.view==="detail")return rDetail();return rList();}
 
-// MyPage
-function rMyPage(){
-  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="panel-box"><p class="panel-title">마이페이지</p><div id="gb-mi"><div class="loading">불러오는 중...</div></div></div><div class="panel-box"><p class="panel-title">비밀번호 변경</p><div class="row"><input id="gb-op" type="password" placeholder="현재 비밀번호"/></div><div class="row"><input id="gb-np" type="password" placeholder="새 비밀번호"/></div><button class="btn-primary" id="gb-cpb">변경하기</button><div class="msg" id="gb-cpm"></div></div>`;
-  document.getElementById("gb-back").onclick=()=>{S.view="list";render();};
-  document.getElementById("gb-cpb").onclick=async()=>{
-    const op=document.getElementById("gb-op").value,np=document.getElementById("gb-np").value,m=document.getElementById("gb-cpm");
-    if(!op||!np){m.textContent="모두 입력해주세요.";m.className="msg err";return;}
-    m.textContent="처리 중...";m.className="msg";
-    const r=await call("changePassword",{username:S.user,oldPassword:op,newPassword:np});
-    m.textContent=r.message||(r.success?"완료":"실패");m.className=r.success?"msg ok":"msg err";
-    if(r.success){document.getElementById("gb-op").value="";document.getElementById("gb-np").value="";}
-  };
-  (async()=>{const b=document.getElementById("gb-mi");const r=await call("getMyInfo",{username:S.user});if(!r.success){b.innerHTML=`<div class="empty">정보를 불러오지 못했어요.</div>`;return;}
-    const rb=r.role==="admin"?'<span class="badge badge-admin">관리자</span>':r.role==="manager"?'<span class="badge badge-manager">매니저</span>':'<span class="badge badge-user">일반</span>';
-    const mb=r.muted?'<span class="badge badge-muted">작성 금지됨</span>':"";
-    b.innerHTML=`<div class="info-row"><span>이름</span><b>${escH(r.username)}</b></div><div class="info-row"><span>권한</span><span>${rb}${mb}</span></div><div class="info-row"><span>작성한 글</span><b>${r.postCount}개</b></div><div class="info-row"><span>댓글</span><b>${r.commentCount}개</b></div>`;
-  })();
-}
 
 // Manage
 function rManage(){
