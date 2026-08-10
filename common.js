@@ -63,10 +63,6 @@ body{
   transition:.15s;white-space:nowrap;
 }
 .bw-nav-links a:hover,.bw-nav-links a.active{background:rgba(255,255,255,.1);color:#fff;}
-.bw-nav-links a.bw-board-link{
-  background:var(--yellow);color:var(--navy2);font-weight:700;
-}
-.bw-nav-links a.bw-board-link:hover{filter:brightness(.94);}
 .bw-hamburger{
   display:none;flex-direction:column;gap:5px;
   background:none;border:none;cursor:pointer;padding:4px;
@@ -213,7 +209,7 @@ body{
       <li><a href="timetable.html" ${current==='timetable.html'?'class="active"':''}>시간표</a></li>
       <li><a href="calendar.html"  ${current==='calendar.html'?'class="active"':''}>학사일정</a></li>
       <li><a href="meal.html"      ${current==='meal.html'?'class="active"':''}>급식</a></li>
-      <li><a href="board.html" class="bw-board-link ${current==='board.html'?'active':''}">게시판</a></li>
+      <li><a href="board.html" ${current==='board.html'?'class="active"':''}>게시판</a></li>
       <li><a href="admin.html"     ${current==='admin.html'?'class="active"':''}>관리자</a></li>
       ${userBlock}
     </ul>
