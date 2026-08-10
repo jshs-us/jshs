@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>급식 — 1-3반</title>
+<style>
+.meal-nav{
+  display:flex;align-items:center;justify-content:center;gap:18px;
+  margin-bottom:6px;
+}
+.meal-arrow{
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid var(--line);background:#fff;
+  color:var(--navy2);font-size:16px;font-weight:900;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.14s;flex:0 0 auto;
+}
+.meal-arrow:hover{background:var(--navy);color:#fff;border-color:var(--navy);}
+.meal-arrow:disabled{opacity:.35;cursor:default;background:#fff;color:var(--navy2);border-color:var(--line);}
+.meal-current{
+  font-size:20px;font-weight:900;color:var(--navy2);
+  letter-spacing:-.02em;min-width:170px;text-align:center;
+}
+.meal-today-btn{
+  display:block;margin:0 auto 22px;
+  font-family:var(--ff);font-size:13px;font-weight:700;
+  color:var(--navy);background:none;border:none;cursor:pointer;
+  text-decoration:underline;text-underline-offset:3px;
+}
+
+.meal-sections{display:flex;flex-direction:column;gap:16px;}
+.meal-card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r);overflow:hidden;
+}
+.meal-card-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 20px;background:var(--navy2);
+}
+.meal-badge{
+  font-size:14px;font-weight:800;color:#fff;
+}
+.meal-kcal{
+  font-size:12.5px;font-weight:600;color:rgba(255,255,255,.75);
+}
+.meal-card-body{padding:16px 20px;}
+.meal-list{list-style:none;padding:0;margin:0;}
+.meal-list li{
+  padding:7px 0;border-bottom:1px solid var(--line);
+  font-size:14.5px;display:flex;align-items:baseline;gap:8px;
+}
+.meal-list li:last-child{border:none;}
+.meal-list li::before{content:"·";color:var(--yellow);font-weight:900;font-size:20px;line-height:1;flex:0 0 auto;}
+.meal-list li span.code{font-size:11.5px;color:var(--muted);}
+
+.meal-origin-toggle{
+  margin-top:10px;font-size:12.5px;color:var(--muted);
+  background:none;border:none;cursor:pointer;text-decoration:underline;
+  text-underline-offset:2px;font-family:var(--ff);padding:0;
+}
+.meal-origin{
+  margin-top:8px;font-size:12px;line-height:1.7;color:var(--muted);
+  display:none;
+}
+.meal-origin.show{display:block;}
+
+.meal-loading,.meal-empty{text-align:center;padding:60px 0;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">🍱 급식</h1>
+  <p class="bw-page-sub" id="meal-sub">스프레드시트에서 실시간으로 불러옵니다.</p>
+
+  <div class="meal-nav">
+    <button class="meal-arrow" id="meal-prev" aria-label="이전 날">‹</button>
+    <span class="meal-current" id="meal-current">불러오는 중...</span>
+    <button class="meal-arrow" id="meal-next" aria-label="다음 날">›</button>
+  </div>
+  <button class="meal-today-btn" id="meal-today">오늘로 이동</button>
+
+  <div id="meal-body"><div class="meal-loading">불러오는 중...</div></div>
+
+  <p style="margin-top:20px;font-size:13px;color:var(--muted);">
+    ※ 급식 정보 수정은
+    <a href="https://docs.google.com/spreadsheets/d/1HZv8yXIzpJppLV6F7zPOhlquw3Ywv_JN45MbHyXhvaQ/edit" target="_blank"
+       style="color:var(--navy);font-weight:700;">스프레드시트</a>에서 직접 해주세요.
+  </p>
+</div>
+
+<script src="common.js"></script>
+<script>
+const SHEET_ID = "1HZv8yXIzpJppLV6F7zPOhlquw3Ywv_JN45MbHyXhvaQ";
+const SHEET_NAME = "급식_가져오기";
+const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+const MEAL_ORDER = ["조식","중식","석식"];
+const DOW = ["일","월","화","수","목","금","토"];
+
+function esc(s){ const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML; }
+
+// gviz 날짜 파싱: "Date(2026,7,10)" 형식 또는 "2026-08-10" 문자열 모두 대응
+function parseCellDate(v){
+  if(v == null) return null;
+  if(typeof v === 'string'){
+    const m = v.match(/^Date\((\d+),(\d+),(\d+)\)$/);
+    if(m) return new Date(Number(m[1]), Number(m[2]), Number(m[3]));
+    const m2 = v.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if(m2) return new Date(Number(m2[1]), Number(m2[2])-1, Number(m2[3]));
+    const d2 = new Date(v);
+    if(!isNaN(d2)) return d2;
+  }
+  return null;
+}
+
+function dateKey(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDate(d){
+  return `${d.getMonth()+1}월 ${d.getDate()}일 (${DOW[d.getDay()]})`;
+}
+
+function splitMenu(text){
+  return String(text||"")
+    .split(/\n|\r/)
+    .map(s=>s.trim())
+    .filter(Boolean);
+}
+
+let dateKeys = [];   // 정렬된 날짜 key 배열 (데이터 있는 날만)
+let dataByDate = {}; // key -> {조식:{menu,cal,origin}, 중식:.., 석식:..}
+let idx = 0;
+
+function render(){
+  const key = dateKeys[idx];
+  const d = new Date(key + "T00:00:00");
+  document.getElementById("meal-current").textContent = fmtDate(d);
+  document.getElementById("meal-prev").disabled = idx===0;
+  document.getElementById("meal-next").disabled = idx===dateKeys.length-1;
+
+  const day = dataByDate[key] || {};
+  const body = document.getElementById("meal-body");
+
+  const cardsHtml = MEAL_ORDER.filter(m=>day[m]).map(m=>{
+    const info = day[m];
+    const items = splitMenu(info.menu).map(item=>{
+      const clean = item.replace(/\s*\([\d.]+\)\s*$/,'');
+      const code = item.match(/\(([\d.]+)\)\s*$/);
+      return `<li>${esc(clean)}${code?`<span class="code">${esc(code[0])}</span>`:''}</li>`;
+    }).join("");
+
+    const originId = `origin-${m}`;
+    return `<div class="meal-card">
+      <div class="meal-card-head">
+        <span class="meal-badge">${m}</span>
+        <span class="meal-kcal">${esc(info.kcal||'')}</span>
+      </div>
+      <div class="meal-card-body">
+        <ul class="meal-list">${items}</ul>
+        ${info.origin ? `
+          <button class="meal-origin-toggle" onclick="document.getElementById('${originId}').classList.toggle('show')">원산지정보 보기</button>
+          <div class="meal-origin" id="${originId}">${esc(info.origin)}</div>
+        ` : ``}
+      </div>
+    </div>`;
+  }).join("");
+
+  body.innerHTML = cardsHtml || `<div class="meal-empty">이 날은 등록된 급식 정보가 없어요.</div>`;
+}
+
+document.getElementById("meal-prev").addEventListener("click",()=>{
+  if(idx>0){ idx--; render(); }
+});
+document.getElementById("meal-next").addEventListener("click",()=>{
+  if(idx<dateKeys.length-1){ idx++; render(); }
+});
+document.getElementById("meal-today").addEventListener("click",()=>{
+  const todayKey = dateKey(new Date());
+  let closest = 0, minDiff = Infinity;
+  dateKeys.forEach((k,i)=>{
+    const diff = Math.abs(new Date(k) - new Date(todayKey));
+    if(diff < minDiff){ minDiff = diff; closest = i; }
+  });
+  idx = closest;
+  render();
+});
+
+fetch(URL)
+  .then(r=>r.text())
+  .then(raw=>{
+    const json = JSON.parse(raw.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
+    const rows = json.table.rows;
+
+    rows.forEach(r=>{
+      const c = r.c || [];
+      const d = parseCellDate(c[0]?.v);
+      if(!d) return;
+      const gubun = (c[1]?.v ?? "").toString().trim();
+      const menu = (c[2]?.v ?? "").toString();
+      const kcal = (c[3]?.v ?? "").toString().trim();
+      const origin = (c[4]?.v ?? "").toString().trim();
+      if(!gubun) return;
+      const key = dateKey(d);
+      if(!dataByDate[key]) dataByDate[key] = {};
+      dataByDate[key][gubun] = {menu, kcal, origin};
+    });
+
+    dateKeys = Object.keys(dataByDate).sort();
+
+    if(!dateKeys.length){
+      document.getElementById("meal-current").textContent = "";
+      document.getElementById("meal-body").innerHTML = `<div class="meal-empty">등록된 급식 정보가 없어요.</div>`;
+      return;
+    }
+
+    const todayKey = dateKey(new Date());
+    idx = dateKeys.findIndex(k=>k>=todayKey);
+    if(idx===-1) idx = dateKeys.length-1;
+
+    document.getElementById("meal-sub").textContent = "화살표로 날짜를 넘기거나 '오늘로 이동'을 눌러보세요.";
+    render();
+  })
+  .catch(err=>{
+    console.error(err);
+    document.getElementById("meal-current").textContent = "";
+    document.getElementById("meal-body").innerHTML =
+      `<div class="meal-empty">스프레드시트를 불러오지 못했어요.<br>공유 설정을 확인해주세요.</div>`;
+  });
+</script>
+</body>
+</html>

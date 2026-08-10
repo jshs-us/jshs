@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>1-3반 정보 제공 사이트</title>
+<style>
+/* ── HERO ── */
+.bw-hero{
+  min-height:calc(100vh - 58px);
+  background:
+    linear-gradient(to bottom, rgba(5,12,40,.72) 0%, rgba(5,12,40,.55) 60%, rgba(5,12,40,.85) 100%),
+    url('https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=1600&q=80') center/cover no-repeat;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:60px 24px 80px;
+  position:relative;
+}
+.bw-hero h1{
+  font-size:clamp(36px,7vw,70px);
+  font-weight:900;letter-spacing:-.04em;
+  color:#fff;margin-bottom:14px;
+}
+.bw-hero-sub{
+  font-size:clamp(15px,2.5vw,20px);
+  color:rgba(255,255,255,.65);
+  margin-bottom:6px;
+}
+.bw-hero-credit{
+  font-size:13px;color:rgba(255,255,255,.35);
+  margin-bottom:52px;
+}
+
+/* ── SECTION NAV BUTTONS ── */
+.bw-section-nav{
+  display:flex;flex-wrap:wrap;gap:12px;justify-content:center;
+  max-width:700px;
+}
+.bw-snav-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  text-decoration:none;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.28);
+  border-radius:12px;
+  padding:12px 24px;
+  font-size:16px;font-weight:700;
+  font-family:var(--ff);
+  transition:.15s;
+  min-width:88px;
+}
+.bw-snav-btn:hover{
+  background:var(--yellow);
+  border-color:var(--yellow);
+  color:var(--navy2);
+}
+.bw-snav-btn.board{
+  background:var(--yellow);
+  border-color:var(--yellow);
+  color:var(--navy2);
+}
+.bw-snav-btn.board:hover{filter:brightness(.94);}
+
+/* ── ANNOUNCE BAR ── */
+.bw-announce{
+  background:#fff;
+  border-bottom:1px solid var(--line);
+  padding:10px 22px;
+  font-size:14px;color:var(--muted);
+  display:flex;align-items:center;gap:10px;
+  max-width:100%;overflow:hidden;
+}
+.bw-announce strong{
+  color:var(--navy);font-weight:700;
+  white-space:nowrap;
+  background:var(--yellow);
+  padding:2px 10px;border-radius:20px;
+  font-size:12px;
+}
+
+/* ── LATEST HW PREVIEW ── */
+.bw-home-sections{
+  max-width:960px;margin:0 auto;
+  padding:40px 22px 0;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:20px;
+}
+.bw-preview-card{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  overflow:hidden;
+  text-decoration:none;color:inherit;
+  transition:.15s;
+  display:block;
+}
+.bw-preview-card:hover{
+  border-color:var(--navy);
+  box-shadow:0 4px 18px rgba(9,31,98,.09);
+  transform:translateY(-2px);
+}
+.bw-preview-head{
+  background:var(--navy2);
+  padding:14px 18px;
+  display:flex;align-items:center;gap:8px;
+  font-size:14px;font-weight:700;color:#fff;
+}
+.bw-preview-head .emo{font-size:18px;}
+.bw-preview-body{padding:16px 18px;min-height:110px;}
+.bw-preview-row{
+  padding:8px 0;
+  border-bottom:1px solid var(--line);
+  font-size:14px;color:var(--ink);
+  display:flex;justify-content:space-between;align-items:center;
+  gap:10px;
+}
+.bw-preview-row:last-child{border:none;}
+.bw-preview-row .sub{font-size:12px;color:var(--muted);white-space:nowrap;}
+.bw-preview-empty{font-size:14px;color:var(--muted);padding:18px 0;text-align:center;}
+.bw-preview-foot{
+  padding:10px 18px;
+  border-top:1px solid var(--line);
+  font-size:13px;font-weight:600;
+  color:var(--navy);
+  text-align:right;
+}
+
+@media(max-width:680px){
+  .bw-home-sections{grid-template-columns:1fr;padding:20px 14px 0;}
+  .bw-section-nav{gap:8px;}
+  .bw-snav-btn{font-size:14px;padding:10px 18px;}
+}
+</style>
+</head>
+<body>
+<!-- HERO -->
+<section class="bw-hero">
+  <img src="logo.png" alt="전남과학고 로고" style="width:100px;height:100px;object-fit:contain;border-radius:50%;background:rgba(255,255,255,0.12);padding:8px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.25);"/>
+  <h1>반갑습니다,</h1>
+  <p class="bw-hero-sub">1-3반 정보 제공 사이트입니다.</p>
+  <p class="bw-hero-credit">Made by Juvnxyk</p>
+  <div class="bw-section-nav">
+    <a href="homework.html"  class="bw-snav-btn">📚 과제</a>
+    <a href="timetable.html" class="bw-snav-btn">📅 시간표</a>
+    <a href="calendar.html"  class="bw-snav-btn">🗓 학사일정</a>
+    <a href="meal.html"      class="bw-snav-btn">🍱 급식</a>
+    <a href="board.html"     class="bw-snav-btn board">💬 게시판</a>
+    <a href="admin.html"     class="bw-snav-btn">👤 관리자</a>
+  </div>
+</section>
+
+<!-- ANNOUNCE -->
+<div class="bw-announce">
+  <strong>공지</strong>
+  <span id="bw-announce-text">사이트를 이용해 주세요. 과제·시간표·급식 정보를 한곳에서 확인할 수 있어요.</span>
+</div>
+
+<!-- QUICK PREVIEW GRID -->
+<div class="bw-home-sections">
+
+  <!-- 과제 미리보기 -->
+  <a href="homework.html" class="bw-preview-card">
+    <div class="bw-preview-head"><span class="emo">📚</span> 최근 과제</div>
+    <div class="bw-preview-body" id="hw-preview"><div class="bw-preview-empty">불러오는 중...</div></div>
+    <div class="bw-preview-foot">전체 과제 보기 →</div>
+  </a>
+
+  <!-- 게시판 미리보기 -->
+  <a href="board.html" class="bw-preview-card">
+    <div class="bw-preview-head"><span class="emo">💬</span> 최근 게시글</div>
+    <div class="bw-preview-body" id="board-preview"><div class="bw-preview-empty">불러오는 중...</div></div>
+    <div class="bw-preview-foot">게시판 바로가기 →</div>
+  </a>
+
+</div>
+
+<div style="height:60px;"></div>
+
+<script src="common.js"></script>
+<script>
+// ── 과제 미리보기 ──────────────────────────────────────────
+const HW_SHEET_ID = "1O67_ZsjapBTwNmskAIdEtiuGhlRbhXJhfy5mu4rLxSE";
+const HW_URL = `https://docs.google.com/spreadsheets/d/${HW_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
+
+// gviz는 날짜를 "Date(2026,7,10)" 형태의 문자열(0-indexed 월)로 반환함
+function parseGvizDate(v){
+  if(v == null) return null;
+  if(v instanceof Date) return v;
+  if(typeof v === 'string'){
+    const m = v.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
+    if(m){
+      const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+      const h = m[4] !== undefined ? Number(m[4]) : 0;
+      const mi = m[5] !== undefined ? Number(m[5]) : 0;
+      const se = m[6] !== undefined ? Number(m[6]) : 0;
+      return new Date(y, mo, d, h, mi, se);
+    }
+    const m2 = v.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+    if(m2){
+      const [, mo, d] = m2.map(Number);
+      const today = new Date();
+      let candidate = new Date(today.getFullYear(), mo - 1, d);
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      if(candidate < todayOnly) candidate = new Date(today.getFullYear() + 1, mo - 1, d);
+      return candidate;
+    }
+    const d2 = new Date(v);
+    if(!isNaN(d2)) return d2;
+  }
+  return null;
+}
+
+function fmtDate(d){
+  if(!d) return '';
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function daysUntil(d){
+  if(!d) return null;
+  const today = new Date();
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((d0 - t0) / 86400000);
+}
+
+fetch(HW_URL)
+  .then(r => r.text())
+  .then(raw => {
+    const json = JSON.parse(raw.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    let rows = json.table.rows.map(r => {
+      const cells = r.c || [];
+      const dueDate = parseGvizDate(cells[0]?.v);
+      const title = cells[2]?.v ?? '';
+      return { dueDate, title };
+    }).filter(r => r.dueDate || r.title);
+
+    rows.sort((a, b) => {
+      if(!a.dueDate) return 1;
+      if(!b.dueDate) return -1;
+      return a.dueDate - b.dueDate;
+    });
+    rows = rows.slice(0, 4);
+
+    const box = document.getElementById('hw-preview');
+    if (!rows.length) { box.innerHTML = '<div class="bw-preview-empty">과제가 없어요.</div>'; return; }
+    box.innerHTML = rows.map(r => {
+      const days = daysUntil(r.dueDate);
+      const daysLabel = days === null ? '' : (days > 0 ? `${days}일 남음` : days === 0 ? 'D-DAY' : `${Math.abs(days)}일 지남`);
+      return `<div class="bw-preview-row">
+        <span>${r.title}</span>
+        <span class="sub">${daysLabel}</span>
+      </div>`;
+    }).join('');
+  })
+  .catch(() => {
+    document.getElementById('hw-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
+  });
+
+// ── 게시판 미리보기 ────────────────────────────────────────
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbytqxpEa69WiNB8AbapQdwo2jbNNzFJvI5fThDEAuLc9MCMeVHCUP7j6lJdvH1tBaTA2Q/exec";
+
+fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
+  .then(r => r.json())
+  .then(res => {
+    const posts = (res.success && res.posts.length) ? res.posts.slice(0,4) : [];
+    const box = document.getElementById('board-preview');
+    if (!posts.length) { box.innerHTML = '<div class="bw-preview-empty">게시글이 없어요.</div>'; return; }
+    function esc(s){ const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML; }
+    function fmtD(d){ const dt=new Date(d);return isNaN(dt)?'':((dt.getMonth()+1)+'/'+ dt.getDate()); }
+    box.innerHTML = posts.map(p=>`
+      <div class="bw-preview-row">
+        <span>${esc(p.title)}</span>
+        <span class="sub">${esc(p.author)} · ${fmtD(p.createdAt)}</span>
+      </div>`).join('');
+  })
+  .catch(() => {
+    document.getElementById('board-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
+  });
+</script>
+</body>
+</html>

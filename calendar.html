@@ -1,0 +1,206 @@
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>학사일정 — 1-3반</title>
+<style>
+.cal-nav{
+  display:flex;align-items:center;justify-content:center;gap:18px;
+  margin-bottom:16px;
+}
+.cal-arrow{
+  width:38px;height:38px;border-radius:50%;
+  border:1px solid var(--line);background:#fff;
+  color:var(--navy2);font-size:16px;font-weight:900;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:.14s;flex:0 0 auto;
+}
+.cal-arrow:hover{background:var(--navy);color:#fff;border-color:var(--navy);}
+.cal-arrow:disabled{opacity:.35;cursor:default;background:#fff;color:var(--navy2);border-color:var(--line);}
+.cal-current{
+  font-size:22px;font-weight:900;color:var(--navy2);
+  letter-spacing:-.02em;min-width:70px;text-align:center;
+}
+
+.cal-tabs{
+  display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap;
+  overflow-x:auto;padding-bottom:2px;justify-content:center;
+}
+.cal-tab{
+  font-family:var(--ff);
+  border:1px solid var(--line);background:#fff;
+  color:var(--muted);font-size:13px;font-weight:600;
+  padding:6px 14px;border-radius:20px;cursor:pointer;
+  transition:.14s;flex:0 0 auto;
+}
+.cal-tab:hover,.cal-tab.active{
+  background:var(--navy);color:#fff;border-color:var(--navy);
+}
+
+.cal-wrap{overflow-x:auto;}
+table.cal-table{
+  width:100%;border-collapse:collapse;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  overflow:hidden;
+  font-size:14px;
+  min-width:380px;
+}
+.cal-table th{
+  background:var(--navy2);color:#fff;
+  font-size:13px;font-weight:700;
+  padding:12px 10px;text-align:center;
+}
+.cal-table td{
+  padding:12px 10px;
+  border-bottom:1px solid var(--line);
+  vertical-align:middle;
+}
+.cal-table tr:last-child td{border-bottom:none;}
+.cal-table td.cal-date{
+  text-align:center;font-weight:800;font-size:15px;
+  width:44px;color:var(--ink);
+}
+.cal-table td.cal-wd{
+  text-align:center;font-weight:600;font-size:12.5px;
+  width:34px;color:var(--muted);
+}
+.cal-table td.cal-event{font-size:14px;}
+.cal-table tr.is-sun td.cal-date,.cal-table tr.is-sun td.cal-wd{color:#d64545;}
+.cal-table tr.is-sat td.cal-date,.cal-table tr.is-sat td.cal-wd{color:#2f5fa8;}
+
+.cal-loading,.cal-empty{text-align:center;padding:60px 0;color:var(--muted);}
+.cal-empty{font-size:15px;}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">🗓 학사일정</h1>
+  <p class="bw-page-sub" id="cal-sub">스프레드시트에서 실시간으로 불러옵니다.</p>
+
+  <div class="cal-nav">
+    <button class="cal-arrow" id="cal-prev" aria-label="이전 달">‹</button>
+    <span class="cal-current" id="cal-current">5월</span>
+    <button class="cal-arrow" id="cal-next" aria-label="다음 달">›</button>
+  </div>
+
+  <nav class="cal-tabs" id="cal-tabs"></nav>
+
+  <div class="cal-wrap">
+    <div id="cal-body"><div class="cal-loading">불러오는 중...</div></div>
+  </div>
+
+  <p style="margin-top:20px;font-size:13px;color:var(--muted);">
+    ※ 학사일정 수정은
+    <a href="https://docs.google.com/spreadsheets/d/1WpQv3cKHgUuBdTWff_OOuhTtgkX2EhLH4eET9ZLOs8Q/edit?gid=879697319" target="_blank"
+       style="color:var(--navy);font-weight:700;">스프레드시트</a>에서 직접 해주세요.
+  </p>
+</div>
+
+<script src="common.js"></script>
+<script>
+const SHEET_ID = "1WpQv3cKHgUuBdTWff_OOuhTtgkX2EhLH4eET9ZLOs8Q";
+const GID = "879697319"; // "Test" 탭
+const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${GID}`;
+
+const MONTHS = [
+  {label:"5월"},{label:"6월"},{label:"7월"},{label:"8월"},{label:"9월"},
+  {label:"10월"},{label:"11월"},{label:"12월"},{label:"1월"},{label:"2월"}
+];
+// A,B,C=5월 / D,E,F=6월 ... 3열씩, 1행=1일부터 시작
+MONTHS.forEach((m,i)=>{ m.startCol = i*3; }); // 0-indexed
+
+const LIST_ROWS = 31;
+
+let current = 0;
+
+function esc(s){ const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML; }
+
+function buildMonthData(rows){
+  MONTHS.forEach(m=>{
+    const dateIdx=m.startCol, wdIdx=m.startCol+1, evIdx=m.startCol+2;
+    const days=[];
+    for(let d=1; d<=LIST_ROWS; d++){
+      const r=rows[d-1];
+      if(!r) break;
+      const cell = r.c || [];
+      const dv = cell[dateIdx]?.v ?? "";
+      if(parseInt(dv,10)!==d) break;
+      days.push({
+        date:d,
+        weekday:(cell[wdIdx]?.v ?? "").toString().trim(),
+        event:(cell[evIdx]?.v ?? "").toString().trim()
+      });
+    }
+    m.days=days;
+  });
+}
+
+function renderTabs(){
+  const el=document.getElementById("cal-tabs");
+  el.innerHTML="";
+  MONTHS.forEach((m,i)=>{
+    const b=document.createElement("button");
+    b.className="cal-tab"+(i===current?" active":"");
+    b.textContent=m.label;
+    b.addEventListener("click",()=>{ current=i; render(); });
+    el.appendChild(b);
+  });
+}
+
+function render(){
+  const m = MONTHS[current];
+  document.getElementById("cal-current").textContent = m.label;
+  document.getElementById("cal-prev").disabled = current===0;
+  document.getElementById("cal-next").disabled = current===MONTHS.length-1;
+  renderTabs();
+
+  const items = (m.days||[]).filter(d=>d.event);
+  const body = document.getElementById("cal-body");
+
+  if(!items.length){
+    body.innerHTML = `<div class="cal-empty">${m.label}에 등록된 일정이 없어요.</div>`;
+    return;
+  }
+
+  const rowsHtml = items.map(d=>{
+    const cls = d.weekday==="일" ? "is-sun" : d.weekday==="토" ? "is-sat" : "";
+    return `<tr class="${cls}">
+      <td class="cal-date">${d.date}</td>
+      <td class="cal-wd">${esc(d.weekday)}</td>
+      <td class="cal-event">${esc(d.event)}</td>
+    </tr>`;
+  }).join("");
+
+  body.innerHTML = `
+    <table class="cal-table">
+      <thead><tr><th>일</th><th>요일</th><th>일정</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>`;
+}
+
+document.getElementById("cal-prev").addEventListener("click",()=>{
+  if(current>0){ current--; render(); }
+});
+document.getElementById("cal-next").addEventListener("click",()=>{
+  if(current<MONTHS.length-1){ current++; render(); }
+});
+
+fetch(URL)
+  .then(r=>r.text())
+  .then(raw=>{
+    const json = JSON.parse(raw.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
+    buildMonthData(json.table.rows);
+    document.getElementById("cal-sub").textContent = "원하는 달을 누르거나 화살표로 이동해보세요.";
+    render();
+  })
+  .catch(err=>{
+    console.error(err);
+    document.getElementById("cal-body").innerHTML =
+      `<div class="cal-empty">스프레드시트를 불러오지 못했어요.<br>공유 설정을 확인해주세요.</div>`;
+  });
+</script>
+</body>
+</html>
