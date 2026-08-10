@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>게시판 — 1-3반</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+.board-wrap{max-width:960px;margin:0 auto;padding:32px 22px 60px;}
+.board-crumb{font-size:13px;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:6px;}
+.board-crumb a{color:var(--navy);text-decoration:none;}
+.board-crumb a:hover{text-decoration:underline;}
+
+/* ── 게시판 컴포넌트 styles (scoped to #gwauri-board) ── */
+#gwauri-board *{box-sizing:border-box;}
+#gwauri-board{
+  --navy:#091f62;--navy-deep:#061442;--yellow:#ffec00;
+  --paper:#f4f6fb;--card:#ffffff;--line:#dfe3ee;--ink:#1b1f2e;--muted:#6b7080;
+  font-family:"Pretendard",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  background:var(--paper);color:var(--ink);font-size:18px;
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(9,31,98,.08),0 12px 32px rgba(9,31,98,.06);
+  border:1px solid var(--line);
+}
+#gwauri-board .gb-header{
+  background:linear-gradient(155deg,var(--navy) 0%,var(--navy-deep) 100%);
+  padding:36px 38px 30px;position:relative;overflow:hidden;
+}
+#gwauri-board .gb-header::after{
+  content:"";position:absolute;right:-60px;top:-60px;
+  width:280px;height:280px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,236,0,.14),transparent 70%);
+}
+#gwauri-board .gb-header-row{display:flex;align-items:center;justify-content:space-between;gap:18px;position:relative;z-index:1;}
+#gwauri-board .gb-brand{display:flex;align-items:center;gap:18px;}
+#gwauri-board .gb-logo-badge{width:64px;height:64px;background:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.18);}
+#gwauri-board .gb-logo-badge span{font-size:32px;}
+#gwauri-board .gb-brand-text h2{margin:0;font-size:28px;color:#fff;letter-spacing:-.01em;}
+#gwauri-board .gb-brand-text p{margin:5px 0 0;font-size:16px;color:rgba(255,255,255,.62);}
+#gwauri-board button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:14px 24px;font-size:17px;font-weight:600;transition:transform .12s,opacity .15s,background .15s,border-color .15s;}
+#gwauri-board button:active{transform:scale(.97);}
+#gwauri-board .btn-primary{background:var(--yellow);color:var(--navy-deep);}
+#gwauri-board .btn-primary:hover{filter:brightness(.96);}
+#gwauri-board .btn-outline-light{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.35);}
+#gwauri-board .btn-outline-light:hover{background:rgba(255,255,255,.18);}
+#gwauri-board .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);}
+#gwauri-board .btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+#gwauri-board .gb-who{font-size:16px;color:rgba(255,255,255,.85);display:flex;align-items:center;gap:14px;}
+#gwauri-board .gb-who b{color:#fff;}
+#gwauri-board .gb-body{padding:30px 36px 38px;}
+#gwauri-board input,#gwauri-board textarea{font-family:inherit;width:100%;border:1.5px solid var(--line);border-radius:10px;padding:15px 17px;font-size:17px;background:#fbfcfe;color:var(--ink);}
+#gwauri-board input:focus,#gwauri-board textarea:focus{outline:none;border-color:var(--navy);background:#fff;}
+#gwauri-board .auth-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:36px;max-width:440px;margin:16px auto 4px;}
+#gwauri-board .auth-box .row{margin-bottom:15px;}
+#gwauri-board .auth-box .row:last-of-type{margin-bottom:24px;}
+#gwauri-board .auth-toggle{display:flex;gap:24px;margin-bottom:24px;border-bottom:1px solid var(--line);}
+#gwauri-board .auth-toggle span{font-size:18px;color:var(--muted);cursor:pointer;padding-bottom:13px;border-bottom:3px solid transparent;margin-bottom:-1px;}
+#gwauri-board .auth-toggle span.active{color:var(--navy);border-color:var(--yellow);font-weight:700;}
+#gwauri-board .msg{font-size:15px;margin-top:12px;min-height:18px;}
+#gwauri-board .msg.err{color:#c23b3b;}
+#gwauri-board .msg.ok{color:#1f8a5c;}
+#gwauri-board .gb-toolbar{display:flex;justify-content:flex-end;margin-bottom:18px;}
+#gwauri-board .post-list{list-style:none;margin:0;padding:0;}
+#gwauri-board .post-item{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:22px 24px;margin-bottom:12px;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s;position:relative;}
+#gwauri-board .post-item::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:4px;border-radius:4px;background:var(--yellow);opacity:0;transition:opacity .15s;}
+#gwauri-board .post-item:hover{border-color:var(--navy);box-shadow:0 4px 14px rgba(9,31,98,.08);}
+#gwauri-board .post-item:hover::before{opacity:1;}
+#gwauri-board .post-title{font-size:20px;font-weight:700;margin:0 0 10px;color:var(--ink);}
+#gwauri-board .post-meta{font-size:15px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;}
+#gwauri-board .post-meta span{display:inline-flex;align-items:center;gap:5px;}
+#gwauri-board .empty{text-align:center;color:var(--muted);font-size:16px;padding:60px 0;background:var(--card);border:1px dashed var(--line);border-radius:14px;}
+#gwauri-board .write-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:30px;margin-bottom:20px;}
+#gwauri-board .write-box textarea{min-height:200px;resize:vertical;margin-top:12px;}
+#gwauri-board .write-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+#gwauri-board .detail-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:32px;}
+#gwauri-board .detail-title{font-size:24px;font-weight:800;margin:0 0 14px;color:var(--navy-deep);}
+#gwauri-board .detail-content{font-size:17px;line-height:1.8;white-space:pre-wrap;margin:22px 0 26px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:24px 0;}
+#gwauri-board .detail-actions{display:flex;justify-content:space-between;align-items:center;}
+#gwauri-board .like-btn{background:#fffbde;color:#8a6d00;border:1px solid #f0e28a;}
+#gwauri-board .like-btn:hover{background:var(--yellow);border-color:var(--yellow);}
+#gwauri-board .loading{text-align:center;color:var(--muted);font-size:16px;padding:60px 0;}
+#gwauri-board .file-row{margin-top:14px;}
+#gwauri-board .file-picker-btn{background:#eef1f8;color:var(--navy);border:1.5px dashed var(--line);width:100%;text-align:left;font-weight:500;}
+#gwauri-board .file-picker-btn:hover{border-color:var(--navy);}
+#gwauri-board .file-preview{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:14px;color:var(--muted);}
+#gwauri-board .file-preview img{max-width:90px;max-height:90px;border-radius:8px;border:1px solid var(--line);}
+#gwauri-board .file-remove{background:transparent;color:#c23b3b;padding:4px 10px;font-size:13px;border:1px solid #f0c8c8;}
+#gwauri-board .detail-attachment{margin:4px 0 20px;}
+#gwauri-board .detail-attachment img{max-width:100%;border-radius:10px;border:1px solid var(--line);display:block;}
+#gwauri-board .detail-attachment .file-link{display:inline-flex;align-items:center;gap:8px;padding:12px 16px;background:#eef1f8;border-radius:10px;color:var(--navy);text-decoration:none;font-size:15px;font-weight:600;}
+#gwauri-board .detail-attachment .file-link:hover{background:#e2e7f5;}
+#gwauri-board .comments-section{margin-top:26px;}
+#gwauri-board .comments-title{font-size:17px;font-weight:700;margin:0 0 14px;color:var(--navy-deep);}
+#gwauri-board .comment-item{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px;}
+#gwauri-board .comment-meta{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:6px;}
+#gwauri-board .comment-meta b{color:var(--ink);}
+#gwauri-board .comment-content{font-size:15px;line-height:1.6;white-space:pre-wrap;}
+#gwauri-board .comment-delete{background:transparent;color:var(--muted);padding:3px 8px;font-size:12px;border:none;text-decoration:underline;}
+#gwauri-board .comment-delete:hover{color:#c23b3b;}
+#gwauri-board .comment-form{display:flex;gap:10px;margin-top:16px;align-items:flex-start;}
+#gwauri-board .comment-form textarea{min-height:52px;resize:vertical;}
+#gwauri-board .comment-empty{text-align:center;color:var(--muted);font-size:14px;padding:20px 0;}
+#gwauri-board .google-link-box{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eef1f8;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;}
+#gwauri-board .google-link-box.linked{background:#eafaf1;border-color:#b9e6cc;color:#1f8a5c;}
+#gwauri-board .google-link-btn{background:#fff;color:var(--navy);border:1px solid var(--line);padding:8px 14px;font-size:13px;}
+#gwauri-board .google-link-btn:hover{border-color:var(--navy);}
+#gwauri-board .file-size-hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
+#gwauri-board .panel-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;margin-bottom:16px;}
+#gwauri-board .panel-title{font-size:20px;font-weight:800;margin:0 0 18px;color:var(--navy-deep);}
+#gwauri-board .info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;}
+#gwauri-board .info-row:last-child{border-bottom:none;}
+#gwauri-board .info-row b{color:var(--muted);font-weight:500;}
+#gwauri-board .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12.5px;font-weight:700;}
+#gwauri-board .badge-admin{background:#fde3e3;color:#b3432b;}
+#gwauri-board .badge-manager{background:#e3edfd;color:#1a56b3;}
+#gwauri-board .badge-user{background:#eef1f8;color:var(--muted);}
+#gwauri-board .badge-muted{background:#f3e3fd;color:#7b2fb3;margin-left:6px;}
+#gwauri-board .user-table{width:100%;border-collapse:collapse;font-size:14px;}
+#gwauri-board .user-table th,#gwauri-board .user-table td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+#gwauri-board .user-table th{color:var(--muted);font-weight:600;font-size:13px;}
+#gwauri-board .user-actions{display:flex;gap:6px;flex-wrap:wrap;}
+#gwauri-board .user-actions button{padding:6px 10px;font-size:12.5px;border:1px solid var(--line);background:#fff;color:var(--ink);}
+#gwauri-board .user-actions button:hover{border-color:var(--navy);}
+#gwauri-board .user-actions select{font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:#fff;}
+#gwauri-board .danger-btn{color:#c23b3b!important;border-color:#f0c8c8!important;}
+#gwauri-board .table-scroll{overflow-x:auto;}
+#gwauri-board .post-admin-actions{display:flex;gap:8px;margin-top:10px;}
+
+@media(max-width:600px){
+  #gwauri-board .gb-header{padding:20px 18px;}
+  #gwauri-board .gb-body{padding:18px 14px 24px;}
+  #gwauri-board .gb-brand-text h2{font-size:20px;}
+  #gwauri-board .gb-logo-badge{width:46px;height:46px;}
+  .board-wrap{padding:18px 12px 40px;}
+}
+</style>
+</head>
+<body>
+<div class="board-wrap">
+  <div class="board-crumb">
+    <a href="index.html">홈</a>
+    <span>›</span>
+    <span>자유게시판</span>
+  </div>
+
+  <div id="gwauri-board">
+    <div class="gb-header">
+      <div class="gb-header-row">
+        <div class="gb-brand">
+          <div class="gb-logo-badge"><img src="logo.png" alt="전남과학고 로고" style="width:48px;height:48px;object-fit:contain;border-radius:50%;"/></div>
+          <div class="gb-brand-text">
+            <h2>과학구리 게시판</h2>
+            <p>누구나 로그인 후 글을 남길 수 있어요</p>
+          </div>
+        </div>
+        <div id="gb-userbar"></div>
+      </div>
+    </div>
+    <div class="gb-body">
+      <div id="gb-app"></div>
+    </div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+(function(){
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbytqxpEa69WiNB8AbapQdwo2jbNNzFJvI5fThDEAuLc9MCMeVHCUP7j6lJdvH1tBaTA2Q/exec";
+const GOOGLE_CLIENT_ID="85712692992-v7cpbmnggqokev9h34aftm33slod93ml.apps.googleusercontent.com";
+const DRIVE_FOLDER="과학구리_게시판_첨부파일";
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.file";
+// ── 사진/파일 업로드: Cloudinary (무료 계정 필요) ──────────────────
+// 1) https://cloudinary.com 무료 가입 → Dashboard에서 "Cloud name" 확인
+// 2) Settings → Upload → Upload presets → Add upload preset → Signing Mode를 "Unsigned"로 설정 후 저장, 그 preset 이름을 아래에 입력
+const CLOUDINARY_CLOUD_NAME="여기에_클라우드네임_입력";
+const CLOUDINARY_UPLOAD_PRESET="여기에_업로드_프리셋_입력";
+const MAX_FILE_SIZE=20*1024*1024; // 구글 계정 미연동 시 1회 업로드 용량 상한(20MB)
+
+// ── 로그인 세션은 common.js(GwakuriAuth)에서 공유 ──────────────────
+const _session=(window.GwakuriAuth&&window.GwakuriAuth.getSession())||null;
+let S={user:_session?_session.username:null,role:_session?_session.role:null,muted:_session?!!_session.muted:false,view:"list",posts:[],currentPost:null,comments:[],selectedFile:null,uploading:false,adminUsers:[]};
+let gToken=null,gTokenClient=null,gLinked=false;
+
+function initG(){
+  if(gTokenClient||typeof google==="undefined"||!google.accounts)return;
+  gTokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:DRIVE_SCOPE,callback:(r)=>{if(r&&r.access_token){gToken=r.access_token;gLinked=true;render();}}});
+}
+function linkG(){initG();if(!gTokenClient){alert("구글 연동이 설정되지 않았어요.");return;}gTokenClient.requestAccessToken();}
+
+const app=document.getElementById("gb-app"),userbar=document.getElementById("gb-userbar");
+function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
+function esc(s){const d=document.createElement("div");d.textContent=String(s??"")}
+function escH(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML;}
+function fmtD(d){const dt=new Date(d);if(isNaN(dt))return"";return dt.getFullYear()+"."+String(dt.getMonth()+1).padStart(2,"0")+"."+String(dt.getDate()).padStart(2,"0")+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");}
+function fmtB(n){if(!n)return"";const u=["B","KB","MB","GB"];let i=0,v=n;while(v>=1024&&i<3){v/=1024;i++;}return v.toFixed(v>=10||!i?0:1)+u[i];}
+function isImg(f){return f&&f.type&&f.type.startsWith("image/");}
+function isImgUrl(url,name){const c=(name||url||"").toLowerCase();return/\.(png|jpe?g|gif|webp|bmp|svg)(\?|$)/.test(c)||c.startsWith("data:image/");}
+
+function renderUserbar(){
+  if(S.user){
+    const rl=S.role==="admin"?" · 관리자":S.role==="manager"?" · 매니저":"";
+    const mb=(S.role==="admin"||S.role==="manager")?`<button class="btn-outline-light" id="gb-manage-btn">관리</button>`:"";
+    userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><button class="btn-outline-light" id="gb-mypage-btn">마이페이지</button>${mb}</div>`;
+    document.getElementById("gb-mypage-btn").onclick=()=>{S.view="mypage";render();};
+    const mgb=document.getElementById("gb-manage-btn");if(mgb)mgb.onclick=()=>{S.view="manage";render();};
+  }else{
+    userbar.innerHTML="";
+  }
+}
+function render(){renderUserbar();if(S.view==="mypage")return rMyPage();if(S.view==="manage")return rManage();if(S.view==="write")return rWrite();if(S.view==="detail")return rDetail();return rList();}
+
+// MyPage
+function rMyPage(){
+  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="panel-box"><p class="panel-title">마이페이지</p><div id="gb-mi"><div class="loading">불러오는 중...</div></div></div><div class="panel-box"><p class="panel-title">비밀번호 변경</p><div class="row"><input id="gb-op" type="password" placeholder="현재 비밀번호"/></div><div class="row"><input id="gb-np" type="password" placeholder="새 비밀번호"/></div><button class="btn-primary" id="gb-cpb">변경하기</button><div class="msg" id="gb-cpm"></div></div>`;
+  document.getElementById("gb-back").onclick=()=>{S.view="list";render();};
+  document.getElementById("gb-cpb").onclick=async()=>{
+    const op=document.getElementById("gb-op").value,np=document.getElementById("gb-np").value,m=document.getElementById("gb-cpm");
+    if(!op||!np){m.textContent="모두 입력해주세요.";m.className="msg err";return;}
+    m.textContent="처리 중...";m.className="msg";
+    const r=await call("changePassword",{username:S.user,oldPassword:op,newPassword:np});
+    m.textContent=r.message||(r.success?"완료":"실패");m.className=r.success?"msg ok":"msg err";
+    if(r.success){document.getElementById("gb-op").value="";document.getElementById("gb-np").value="";}
+  };
+  (async()=>{const b=document.getElementById("gb-mi");const r=await call("getMyInfo",{username:S.user});if(!r.success){b.innerHTML=`<div class="empty">정보를 불러오지 못했어요.</div>`;return;}
+    const rb=r.role==="admin"?'<span class="badge badge-admin">관리자</span>':r.role==="manager"?'<span class="badge badge-manager">매니저</span>':'<span class="badge badge-user">일반</span>';
+    const mb=r.muted?'<span class="badge badge-muted">작성 금지됨</span>':"";
+    b.innerHTML=`<div class="info-row"><span>이름</span><b>${escH(r.username)}</b></div><div class="info-row"><span>권한</span><span>${rb}${mb}</span></div><div class="info-row"><span>작성한 글</span><b>${r.postCount}개</b></div><div class="info-row"><span>댓글</span><b>${r.commentCount}개</b></div>`;
+  })();
+}
+
+// Manage
+function rManage(){
+  const isA=S.role==="admin";
+  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="panel-box"><p class="panel-title">게시글 관리</p><div id="gb-mp"><div class="loading">불러오는 중...</div></div></div>${isA?`<div class="panel-box"><p class="panel-title">회원 관리</p><div class="table-scroll"><div id="gb-mu"><div class="loading">불러오는 중...</div></div></div></div>`:""}`;
+  document.getElementById("gb-back").onclick=()=>{S.view="list";render();};
+  loadManPosts();if(isA)loadManUsers();
+}
+async function loadManPosts(){
+  const b=document.getElementById("gb-mp");if(!b)return;
+  try{const r=await call("listPosts",{});const ps=r.success?r.posts:[];
+    if(!ps.length){b.innerHTML=`<div class="empty">게시글이 없어요.</div>`;return;}
+    b.innerHTML=`<ul class="post-list">${ps.map(p=>`<li class="post-item" style="cursor:default"><p class="post-title">${escH(p.title)}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span></div><div class="post-admin-actions"><button class="btn-ghost danger-btn" data-dp="${p.id}">삭제</button></div></li>`).join("")}</ul>`;
+    b.querySelectorAll("[data-dp]").forEach(btn=>btn.onclick=async()=>{if(!confirm("삭제할까요?"))return;const r=await call("adminDeletePost",{id:btn.dataset.dp,actor:S.user});if(r.success)loadManPosts();else alert(r.message||"삭제 실패");});
+  }catch(e){b.innerHTML=`<div class="empty">불러오지 못했어요.</div>`;}
+}
+async function loadManUsers(){
+  const b=document.getElementById("gb-mu");if(!b)return;
+  try{const r=await call("listUsers",{actor:S.user});
+    if(!r.success){b.innerHTML=`<div class="empty">${escH(r.message||"불러오지 못했어요.")}</div>`;return;}
+    b.innerHTML=`<table class="user-table"><thead><tr><th>이름</th><th>가입일</th><th>권한</th><th>상태</th><th>관리</th></tr></thead><tbody>${r.users.map(u=>`<tr><td>${escH(u.username)}${u.isFounder?'<span class="badge badge-admin" style="margin-left:6px">최초</span>':""}</td><td>${fmtD(u.createdAt)}</td><td>${u.isFounder?'<span class="badge badge-admin">관리자</span>':`<select class="role-select" data-u="${escH(u.username)}"><option value="user"${u.role==="user"?" selected":""}>일반</option><option value="manager"${u.role==="manager"?" selected":""}>매니저</option><option value="admin"${u.role==="admin"?" selected":""}>관리자</option></select>`}</td><td>${u.muted?'<span class="badge badge-muted">작성금지</span>':"-"}</td><td><div class="user-actions">${u.isFounder?"":` <button data-mute="${escH(u.username)}" data-cur="${u.muted?1:0}">${u.muted?"금지해제":"작성금지"}</button><button data-rst="${escH(u.username)}">비번초기화</button><button class="danger-btn" data-kick="${escH(u.username)}">강제탈퇴</button>`}</div></td></tr>`).join("")}</tbody></table>`;
+    b.querySelectorAll(".role-select").forEach(s=>s.onchange=async()=>{const r=await call("setRole",{actor:S.user,targetUsername:s.dataset.u,newRole:s.value});if(!r.success){alert(r.message||"실패");loadManUsers();}});
+    b.querySelectorAll("[data-mute]").forEach(btn=>btn.onclick=async()=>{const r=await call("setMuted",{actor:S.user,targetUsername:btn.dataset.mute,muted:String(btn.dataset.cur==="0")});if(r.success)loadManUsers();else alert(r.message||"실패");});
+    b.querySelectorAll("[data-rst]").forEach(btn=>btn.onclick=async()=>{if(!confirm(btn.dataset.rst+"님 비밀번호를 0000으로 초기화?"))return;const r=await call("resetPassword",{actor:S.user,targetUsername:btn.dataset.rst});alert(r.message||(r.success?"완료":"실패"));});
+    b.querySelectorAll("[data-kick]").forEach(btn=>btn.onclick=async()=>{if(!confirm(btn.dataset.kick+"님을 강제 탈퇴시킬까요?"))return;const r=await call("kickUser",{actor:S.user,targetUsername:btn.dataset.kick});if(r.success)loadManUsers();else alert(r.message||"실패");});
+  }catch(e){b.innerHTML=`<div class="empty">불러오지 못했어요.</div>`;}
+}
+
+// List
+function rList(){
+  const lh=S.posts.length?`<ul class="post-list">${S.posts.map(p=>`<li class="post-item" data-id="${p.id}"><p class="post-title">${escH(p.title)}${p.fileUrl?" 📎":""}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👍 ${p.likes}</span><span>👁 ${p.views}</span></div></li>`).join("")}</ul>`:`<div class="empty">아직 등록된 글이 없어요.<br>첫 글을 남겨보세요.</div>`;
+  app.innerHTML=`<div class="gb-toolbar"><button class="btn-primary" id="gb-np">✏️ 글쓰기</button></div>${lh}`;
+  document.getElementById("gb-np").onclick=()=>{if(!S.user)return;S.selectedFile=null;S.view="write";render();};
+  app.querySelectorAll(".post-item").forEach(el=>el.onclick=()=>openPost(el.dataset.id));
+}
+
+// Write
+function rWrite(){
+  if(S.muted){app.innerHTML=`<div class="write-box"><div class="empty">게시글 작성이 제한된 계정이에요.</div><div class="write-actions"><button class="btn-ghost" id="gb-cancel">목록으로</button></div></div>`;document.getElementById("gb-cancel").onclick=()=>{S.view="list";render();};return;}
+  initG();
+  const lbh=gLinked?`<div class="google-link-box linked">✅ 구글 계정 연동됨 — 대용량 파일도 가능해요.</div>`:`<div class="google-link-box"><span>구글 계정을 연동하면 대용량 파일도 올릴 수 있어요.</span><button class="google-link-btn" id="gb-gl">구글 계정 연동</button></div>`;
+  app.innerHTML=`<div class="write-box">${lbh}<input id="gb-ti" type="text" placeholder="제목"/><textarea id="gb-co" placeholder="내용을 입력하세요"></textarea><div class="file-row" id="gb-fr"></div><div class="write-actions"><button class="btn-ghost" id="gb-cancel">취소</button><button class="btn-primary" id="gb-sub">등록</button></div><div class="msg" id="gb-wm"></div></div>`;
+  renderFP();
+  const gb=document.getElementById("gb-gl");if(gb)gb.onclick=linkG;
+  document.getElementById("gb-cancel").onclick=()=>{S.selectedFile=null;S.view="list";render();};
+  document.getElementById("gb-sub").onclick=async()=>{
+    const ti=document.getElementById("gb-ti").value.trim(),co=document.getElementById("gb-co").value.trim(),m=document.getElementById("gb-wm");
+    if(!ti||!co){m.textContent="제목과 내용을 모두 입력해주세요.";m.className="msg err";return;}
+    let fu="",fn="";
+    if(S.selectedFile){const f=S.selectedFile.file;try{
+      if(gLinked&&gToken){m.textContent="업로드 중... (구글 드라이브)";m.className="msg";const up=await uploadGD(f,p=>{m.textContent=`업로드 중... ${p}%`;});fu=up.url;fn=up.name;}
+      else{if(f.size>MAX_FILE_SIZE){m.textContent=`${fmtB(MAX_FILE_SIZE)} 초과 파일은 구글 계정 연동 후 올릴 수 있어요.`;m.className="msg err";return;}m.textContent="업로드 중...";m.className="msg";const up=await uploadCloudinary(f,p=>{m.textContent=`업로드 중... ${p}%`;});fu=up.fileUrl;fn=up.fileName;}
+    }catch(e){m.textContent="파일 업로드 실패: "+(e&&e.message?e.message:"오류");m.className="msg err";return;}}
+    m.textContent="등록 중...";m.className="msg";
+    try{const pa={title:ti,content:co,author:S.user};if(fu){pa.fileUrlDirect=fu;pa.fileNameDirect=fn;}
+      const r=await call("createPostDirect",pa);
+      if(r.success){S.selectedFile=null;S.view="list";await loadPosts();}else{m.textContent=r.message;m.className="msg err";}}
+    catch(e){m.textContent="등록에 실패했습니다.";m.className="msg err";}
+  };
+}
+function renderFP(){
+  const row=document.getElementById("gb-fr");if(!row)return;
+  if(!S.selectedFile){
+    row.innerHTML=`<button class="file-picker-btn" id="gb-pf" type="button">📎 사진 또는 파일 첨부</button><input type="file" id="gb-fi" style="display:none"/><div class="file-size-hint">${gLinked?"구글 연동됨: 대용량 가능":`연동 전: ${fmtB(MAX_FILE_SIZE)} 이하`}</div>`;
+    document.getElementById("gb-pf").onclick=()=>document.getElementById("gb-fi").click();
+    document.getElementById("gb-fi").onchange=e=>{const f=e.target.files[0];if(!f)return;const img=isImg(f);S.selectedFile={file:f,previewUrl:img?URL.createObjectURL(f):null,isImage:img};renderFP();};
+  }else{
+    const f=S.selectedFile;
+    row.innerHTML=`<div class="file-preview">${f.isImage?`<img src="${f.previewUrl}" alt="미리보기"/>`:`<span>📄</span>`}<span>${escH(f.file.name)} (${fmtB(f.file.size)})</span><button class="file-remove" id="gb-rm" type="button">제거</button></div>`;
+    document.getElementById("gb-rm").onclick=()=>{S.selectedFile=null;renderFP();};
+  }
+}
+function uploadCloudinary(file,onP){
+  return new Promise((res,rej)=>{
+    if(!CLOUDINARY_CLOUD_NAME||CLOUDINARY_CLOUD_NAME.indexOf("여기에")===0||!CLOUDINARY_UPLOAD_PRESET||CLOUDINARY_UPLOAD_PRESET.indexOf("여기에")===0){
+      rej(new Error("사진 업로드 저장소(Cloudinary) 설정이 아직 안 되어 있어요. 관리자에게 문의해주세요."));
+      return;
+    }
+    const fd=new FormData();
+    fd.append("file",file);
+    fd.append("upload_preset",CLOUDINARY_UPLOAD_PRESET);
+    const x=new XMLHttpRequest();
+    x.open("POST",`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,true);
+    x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};
+    x.onload=()=>{
+      if(x.status>=200&&x.status<300){
+        try{const j=JSON.parse(x.responseText);res({fileUrl:j.secure_url,fileName:file.name});}
+        catch(e){rej(new Error("응답 처리 실패"));}
+      }else rej(new Error("업로드 실패 ("+x.status+")"));
+    };
+    x.onerror=()=>rej(new Error("네트워크 오류"));
+    x.send(fd);
+  });
+}
+async function uploadGD(file,onP){
+  let fid=null;
+  const q=encodeURIComponent(`name='${DRIVE_FOLDER.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const sr=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,{headers:{"Authorization":"Bearer "+gToken}});
+  const sd=await sr.json();
+  if(sd.files&&sd.files.length)fid=sd.files[0].id;
+  else{const cr=await fetch("https://www.googleapis.com/drive/v3/files",{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json"},body:JSON.stringify({name:DRIVE_FOLDER,mimeType:"application/vnd.google-apps.folder"})});fid=(await cr.json()).id;}
+  const ir=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json; charset=UTF-8","X-Upload-Content-Type":file.type||"application/octet-stream"},body:JSON.stringify({name:file.name,parents:[fid]})});
+  if(!ir.ok)throw new Error("업로드 세션 시작 실패");
+  const uploadUrl=ir.headers.get("Location");if(!uploadUrl)throw new Error("업로드 URL 없음");
+  const fileId=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open("PUT",uploadUrl,true);x.setRequestHeader("Content-Type",file.type||"application/octet-stream");x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};x.onload=()=>{if(x.status>=200&&x.status<300){try{res(JSON.parse(x.responseText).id);}catch{rej(new Error("응답 처리 실패"));}}else rej(new Error("업로드 실패 ("+x.status+")"));};x.onerror=()=>rej(new Error("네트워크 오류"));x.send(file);});
+  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json"},body:JSON.stringify({role:"reader",type:"anyone"})});
+  return{url:`https://drive.google.com/file/d/${fileId}/view`,name:file.name};
+}
+
+// Detail
+function rDetail(){
+  const p=S.currentPost,cm=S.role==="admin"||S.role==="manager";
+  const att=p.fileUrl?(isImgUrl(p.fileUrl,p.fileName)?`<div class="detail-attachment"><img src="${escH(p.fileUrl)}" alt="첨부"/></div>`:`<div class="detail-attachment"><a class="file-link" href="${escH(p.fileUrl)}" target="_blank" rel="noopener">📎 ${escH(p.fileName||"첨부파일")} 열기</a></div>`):"";
+  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="detail-box"><p class="detail-title">${escH(p.title)}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👁 ${p.views}</span></div>${att}<div class="detail-content">${escH(p.content)}</div><div class="detail-actions"><button class="btn-ghost" id="gb-back2">목록으로</button><div style="display:flex;gap:8px">${cm?`<button class="btn-ghost danger-btn" id="gb-adel">🗑 삭제(관리)</button>`:""}<button class="like-btn" id="gb-like">👍 좋아요 ${p.likes}</button></div></div><div class="comments-section"><p class="comments-title">댓글</p><div id="gb-cl"><div class="loading">불러오는 중...</div></div>${S.user?(S.muted?`<div class="comment-empty">작성 제한 계정입니다.</div>`:`<div class="comment-form"><textarea id="gb-ci" placeholder="댓글을 입력하세요"></textarea><button class="btn-primary" id="gb-cs">등록</button></div>`):`<div class="comment-empty">댓글을 작성하려면 로그인해주세요.</div>`}</div></div>`;
+  const bk=()=>{S.view="list";render();};
+  document.getElementById("gb-back").onclick=bk;document.getElementById("gb-back2").onclick=bk;
+  document.getElementById("gb-like").onclick=async()=>{if(!S.user)return;const r=await call("likePost",{id:p.id});if(r.success){p.likes=r.likes;rDetail();}};
+  const ad=document.getElementById("gb-adel");if(ad)ad.onclick=async()=>{if(!confirm("삭제할까요?"))return;const r=await call("adminDeletePost",{id:p.id,actor:S.user});if(r.success){S.view="list";await loadPosts();}else alert(r.message||"삭제 실패");};
+  const cs=document.getElementById("gb-cs");if(cs)cs.onclick=async()=>{const ci=document.getElementById("gb-ci");const c=ci.value.trim();if(!c)return;cs.disabled=true;try{const r=await call("addComment",{postId:p.id,author:S.user,content:c});if(r.success){ci.value="";await loadCmts(p.id);}else alert(r.message||"댓글 등록 실패");}finally{cs.disabled=false;}};
+  loadCmts(p.id);
+}
+function renderCmts(){
+  const b=document.getElementById("gb-cl");if(!b)return;
+  if(!S.comments.length){b.innerHTML=`<div class="comment-empty">아직 댓글이 없어요.</div>`;return;}
+  const cm=S.role==="admin"||S.role==="manager";
+  b.innerHTML=S.comments.map(c=>`<div class="comment-item"><div class="comment-meta"><span><b>${escH(c.author)}</b> · ${fmtD(c.createdAt)}</span>${(S.user===c.author||cm)?`<button class="comment-delete" data-id="${c.id}">삭제</button>`:""}</div><div class="comment-content">${escH(c.content)}</div></div>`).join("");
+  b.querySelectorAll(".comment-delete").forEach(btn=>btn.onclick=async()=>{const r=await call("deleteComment",{id:btn.dataset.id,author:S.user});if(r.success)await loadCmts(S.currentPost.id);});
+}
+async function loadCmts(pid){try{const r=await call("listComments",{postId:pid});S.comments=r.success?r.comments:[];}catch{S.comments=[];}renderCmts();}
+async function openPost(id){app.innerHTML=`<div class="loading">불러오는 중...</div>`;const r=await call("getPost",{id});if(r.success){S.currentPost=r.post;S.view="detail";render();}else{S.view="list";render();}}
+async function loadPosts(){app.innerHTML=`<div class="loading">불러오는 중...</div>`;try{const r=await call("listPosts",{});S.posts=r.success?r.posts:[];}catch{S.posts=[];}render();}
+
+loadPosts();
+})();
+</script>
+</body>
+</html>

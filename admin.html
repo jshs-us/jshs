@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>관리자 정보 — 1-3반</title>
+<style>
+.admin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-bottom:32px;}
+.admin-card{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:26px;
+  position:relative;overflow:hidden;
+}
+.admin-card::before{
+  content:"";position:absolute;top:0;left:0;right:0;height:4px;
+  background:linear-gradient(90deg,var(--yellow),rgba(255,236,0,.3));
+}
+.admin-avatar{
+  width:52px;height:52px;border-radius:50%;
+  background:linear-gradient(135deg,var(--yellow),rgba(255,236,0,.4));
+  display:flex;align-items:center;justify-content:center;
+  font-size:22px;font-weight:900;color:var(--navy2);
+  margin-bottom:14px;
+}
+.admin-name{font-size:18px;font-weight:800;color:var(--navy2);margin-bottom:4px;}
+.admin-role{
+  font-size:12px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;
+  display:inline-block;padding:3px 10px;border-radius:20px;
+  background:#eef1f8;color:var(--navy);
+  margin-bottom:14px;
+}
+.admin-role.teacher{background:#fde3e3;color:#b3432b;}
+.admin-contact{
+  font-size:14px;color:var(--muted);
+  display:flex;flex-direction:column;gap:6px;
+}
+.admin-contact a{color:var(--navy);font-weight:600;text-decoration:none;}
+.admin-contact a:hover{text-decoration:underline;}
+
+.admin-notice{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:24px 28px;
+  font-size:15px;line-height:1.8;color:var(--muted);
+}
+.admin-notice strong{color:var(--ink);}
+.admin-notice ul{padding-left:20px;margin-top:10px;}
+.admin-notice li{margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">👤 관리자 정보</h1>
+  <p class="bw-page-sub">사이트 관련 문의는 아래 관리자에게 연락해주세요.</p>
+
+  <div class="admin-grid">
+    <div class="admin-card">
+      <div class="admin-avatar">J</div>
+      <div class="admin-name">Juvnxyk</div>
+      <div class="admin-role">개인 관리자</div>
+      <div class="admin-contact">
+        <span>📧 <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a></span>
+        <span style="font-size:13px;">사이트 제작 · 개발 · 게시판 관리</span>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-avatar">N</div>
+      <div class="admin-name">부관리자</div>
+      <div class="admin-role">개인 관리자</div>
+      <div class="admin-contact">
+        <span>📧 <a href="mailto:nbs372@naver.com">nbs372@naver.com</a></span>
+        <span style="font-size:13px;">콘텐츠 관리 · 정보 업데이트</span>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-avatar">T</div>
+      <div class="admin-name">교사 계정</div>
+      <div class="admin-role teacher">교사</div>
+      <div class="admin-contact">
+        <span>📧 <a href="mailto:admin372@fe.jne.kr">admin372@fe.jne.kr</a></span>
+        <span style="font-size:13px;">학교 공식 계정 · 최고 권한</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-notice">
+    <strong>게시판 관리자 권한 관련 안내</strong>
+    <ul>
+      <li>게시판 회원 권한 변경, 작성 금지 처리 등은 교사 계정 또는 개인 관리자에게 문의해주세요.</li>
+      <li>부적절한 게시글 신고는 <a href="mailto:roysjh7@gmail.com" style="color:var(--navy);font-weight:700;">roysjh7@gmail.com</a>으로 연락해주세요.</li>
+      <li>스프레드시트 과제·시간표 수정 권한이 필요한 경우 관리자에게 문의해주세요.</li>
+    </ul>
+  </div>
+</div>
+<script src="common.js"></script>
+</body>
+</html>

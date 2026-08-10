@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>과제 — 1-3반</title>
+<style>
+table.hw-table{
+  width:100%;border-collapse:collapse;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--r);
+  overflow:hidden;
+  font-size:15px;
+}
+.hw-table th{
+  background:var(--navy2);color:#fff;
+  font-size:13px;font-weight:700;
+  padding:13px 16px;text-align:left;
+}
+.hw-table td{
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+  vertical-align:middle;
+}
+.hw-table tr:last-child td{border-bottom:none;}
+.hw-table tr:hover td{background:var(--paper);}
+.hw-badge{
+  display:inline-block;
+  padding:3px 10px;border-radius:20px;
+  font-size:12px;font-weight:700;
+  background:#eef1f8;color:var(--navy);
+  white-space:nowrap;
+}
+.hw-due{font-size:13px;color:var(--muted);white-space:nowrap;}
+.hw-due.soon{color:#c23b3b;font-weight:700;}
+.hw-empty{
+  text-align:center;padding:60px 0;
+  color:var(--muted);font-size:15px;
+}
+.hw-loading{text-align:center;padding:60px 0;color:var(--muted);}
+@media(max-width:580px){
+  .hw-table th:nth-child(2),.hw-table td:nth-child(2){display:none;}
+}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">📚 과제</h1>
+  <p class="bw-page-sub">스프레드시트에서 실시간으로 불러옵니다. 마감일이 가까운 항목은 빨간색으로 표시돼요.</p>
+
+  <div id="hw-wrap"><div class="hw-loading">불러오는 중...</div></div>
+
+  <p style="margin-top:20px;font-size:13px;color:var(--muted);">
+    ※ 과제 추가·수정은
+    <a href="https://docs.google.com/spreadsheets/d/1O67_ZsjapBTwNmskAIdEtiuGhlRbhXJhfy5mu4rLxSE/edit" target="_blank"
+       style="color:var(--navy);font-weight:700;">스프레드시트</a>에서 직접 해주세요.
+  </p>
+</div>
+
+<script src="common.js"></script>
+<script>
+const SHEET_ID = "1O67_ZsjapBTwNmskAIdEtiuGhlRbhXJhfy5mu4rLxSE";
+const URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+
+function esc(s){ const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML; }
+
+// gviz는 날짜를 "Date(2026,7,10)" 형태의 문자열(0-indexed 월)로 반환함
+function parseGvizDate(v){
+  if(v == null) return null;
+  if(v instanceof Date) return v;
+  if(typeof v === 'string'){
+    const m = v.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
+    if(m){
+      const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+      const h = m[4] !== undefined ? Number(m[4]) : 0;
+      const mi = m[5] !== undefined ? Number(m[5]) : 0;
+      const se = m[6] !== undefined ? Number(m[6]) : 0;
+      return new Date(y, mo, d, h, mi, se);
+    }
+    // "8/10" 또는 "8-10" 같은 M/D 형식 (연도 없음)
+    const m2 = v.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+    if(m2){
+      const [, mo, d] = m2.map(Number);
+      const today = new Date();
+      let year = today.getFullYear();
+      let candidate = new Date(year, mo - 1, d);
+      const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      // 이미 지난 월/일이면 내년으로 간주
+      if(candidate < todayOnly) candidate = new Date(year + 1, mo - 1, d);
+      return candidate;
+    }
+    const d2 = new Date(v);
+    if(!isNaN(d2)) return d2;
+  }
+  return null;
+}
+
+function fmtDate(d){
+  if(!d) return '';
+  return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function daysUntil(d){
+  if(!d) return null;
+  const today = new Date();
+  const t0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const d0 = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  return Math.round((d0 - t0) / 86400000);
+}
+
+function renderTable(rows){
+  const wrap = document.getElementById('hw-wrap');
+  if(!rows.length){
+    wrap.innerHTML='<div class="hw-empty">과제가 없어요 🎉</div>';
+    return;
+  }
+  wrap.innerHTML = `
+    <table class="hw-table">
+      <thead><tr>
+        <th style="width:120px">기한</th>
+        <th style="width:100px">남은 일자</th>
+        <th>내용</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r=>{
+          const [dueDate, , title] = r;
+          const days = daysUntil(dueDate);
+          const soonClass = (days !== null && days <= 2) ? 'soon' : '';
+          let daysLabel = '-';
+          if(days !== null){
+            if(days > 0) daysLabel = `${days}일 남음`;
+            else if(days === 0) daysLabel = 'D-DAY';
+            else daysLabel = `${Math.abs(days)}일 지남`;
+          }
+          return `<tr>
+            <td><span class="hw-due">${fmtDate(dueDate)}</span></td>
+            <td><span class="hw-due ${soonClass}">${daysLabel}</span></td>
+            <td><div style="font-weight:600">${esc(title)}</div></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+fetch(URL)
+  .then(r=>r.text())
+  .then(raw=>{
+    const json = JSON.parse(raw.replace(/^[^(]+\(/,'').replace(/\);?\s*$/,''));
+    const rows = json.table.rows;
+    let allRows = rows.map(r=>{
+      const c = r.c || [];
+      const dueDate = parseGvizDate(c[0]?.v);
+      const title = c[2]?.v ?? '';
+      return [dueDate, null, title];
+    }).filter(r=>r[0] || r[2]);
+
+    // 기한 순 정렬 (가까운 날짜부터)
+    allRows.sort((a,b)=>{
+      if(!a[0]) return 1;
+      if(!b[0]) return -1;
+      return a[0] - b[0];
+    });
+
+    renderTable(allRows);
+  })
+  .catch(()=>{
+    document.getElementById('hw-wrap').innerHTML='<div class="hw-empty">스프레드시트를 불러오지 못했어요.<br>스프레드시트 공유 설정(링크 공유)을 확인해주세요.</div>';
+  });
+</script>
+</body>
+</html>
