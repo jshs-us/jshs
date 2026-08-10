@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>마이페이지 — 1-3반</title>
+<style>
+.mp-panel{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:28px;margin-bottom:16px;
+}
+.mp-panel-title{font-size:18px;font-weight:800;margin:0 0 18px;color:var(--navy2);}
+.mp-info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;}
+.mp-info-row:last-child{border-bottom:none;}
+.mp-info-row span:first-child{color:var(--muted);}
+.mp-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12.5px;font-weight:700;}
+.mp-badge-admin{background:#fde3e3;color:#b3432b;}
+.mp-badge-manager{background:#e3edfd;color:#1a56b3;}
+.mp-badge-user{background:#eef1f8;color:var(--muted);}
+.mp-badge-muted{background:#f3e3fd;color:#7b2fb3;margin-left:6px;}
+.mp-row{margin-bottom:14px;}
+.mp-row input{
+  font-family:var(--ff);width:100%;border:1.5px solid var(--line);border-radius:10px;
+  padding:13px 15px;font-size:15px;background:#fbfcfe;color:var(--ink);
+}
+.mp-row input:focus{outline:none;border-color:var(--navy);background:#fff;}
+.mp-btn{
+  font-family:var(--ff);cursor:pointer;border:none;border-radius:10px;
+  padding:12px 22px;font-size:14.5px;font-weight:700;
+  background:var(--yellow);color:var(--navy2);transition:.15s;
+}
+.mp-btn:hover{filter:brightness(.96);}
+.mp-btn:disabled{opacity:.6;cursor:default;}
+.mp-msg{font-size:14px;margin-top:12px;min-height:18px;}
+.mp-msg.err{color:#c23b3b;}
+.mp-msg.ok{color:#1f8a5c;}
+.mp-loading,.mp-empty{text-align:center;padding:40px 0;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">👤 마이페이지</h1>
+  <p class="bw-page-sub">내 계정 정보를 확인하고 비밀번호를 변경할 수 있어요.</p>
+
+  <div class="mp-panel">
+    <p class="mp-panel-title">내 정보</p>
+    <div id="mp-info"><div class="mp-loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="mp-panel">
+    <p class="mp-panel-title">비밀번호 변경</p>
+    <div class="mp-row"><input id="mp-op" type="password" placeholder="현재 비밀번호" autocomplete="current-password"/></div>
+    <div class="mp-row"><input id="mp-np" type="password" placeholder="새 비밀번호" autocomplete="new-password"/></div>
+    <button class="mp-btn" id="mp-cpb">변경하기</button>
+    <div class="mp-msg" id="mp-cpm"></div>
+  </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+(function(){
+  function escH(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
+
+  const session = window.GwakuriAuth && window.GwakuriAuth.getSession();
+  if(!session){
+    // common.js가 로그인 게이트를 이미 띄우고 있으므로 여기서는 더 진행하지 않음
+    return;
+  }
+
+  const infoBox = document.getElementById('mp-info');
+  const cpb = document.getElementById('mp-cpb');
+  const cpm = document.getElementById('mp-cpm');
+  const opEl = document.getElementById('mp-op');
+  const npEl = document.getElementById('mp-np');
+
+  async function loadInfo(){
+    try{
+      const r = await window.GwakuriAuth.call('getMyInfo', { username: session.username });
+      if(!r.success){ infoBox.innerHTML = '<div class="mp-empty">정보를 불러오지 못했어요.</div>'; return; }
+      const rb = r.role==='admin' ? '<span class="mp-badge mp-badge-admin">관리자</span>'
+        : r.role==='manager' ? '<span class="mp-badge mp-badge-manager">매니저</span>'
+        : '<span class="mp-badge mp-badge-user">일반</span>';
+      const mb = r.muted ? '<span class="mp-badge mp-badge-muted">작성 금지됨</span>' : '';
+      infoBox.innerHTML = `
+        <div class="mp-info-row"><span>이름</span><b>${escH(r.username)}</b></div>
+        <div class="mp-info-row"><span>권한</span><span>${rb}${mb}</span></div>
+        <div class="mp-info-row"><span>작성한 글</span><b>${r.postCount}개</b></div>
+        <div class="mp-info-row"><span>댓글</span><b>${r.commentCount}개</b></div>`;
+    }catch(e){
+      infoBox.innerHTML = '<div class="mp-empty">정보를 불러오지 못했어요.</div>';
+    }
+  }
+
+  cpb.addEventListener('click', async ()=>{
+    const op = opEl.value, np = npEl.value;
+    if(!op || !np){ cpm.textContent='모두 입력해주세요.'; cpm.className='mp-msg err'; return; }
+    cpb.disabled = true;
+    cpm.textContent = '처리 중...'; cpm.className = 'mp-msg';
+    try{
+      const r = await window.GwakuriAuth.call('changePassword', { username: session.username, oldPassword: op, newPassword: np });
+      cpm.textContent = r.message || (r.success ? '완료' : '실패');
+      cpm.className = r.success ? 'mp-msg ok' : 'mp-msg err';
+      if(r.success){ opEl.value=''; npEl.value=''; }
+    }catch(e){
+      cpm.textContent = '연결 실패. 잠시 후 다시 시도해주세요.'; cpm.className = 'mp-msg err';
+    }
+    cpb.disabled = false;
+  });
+
+  loadInfo();
+})();
+</script>
+</body>
+</html>

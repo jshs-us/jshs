@@ -201,7 +201,7 @@ body{
   // NAV
   const current = location.pathname.split('/').pop()||'index.html';
   const userBlock = session
-    ? `<li class="bw-nav-userwrap"><span class="bw-nav-username"><b>${escapeHtml(session.username)}</b>님</span><button class="bw-nav-logout" id="bw-logout-btn" type="button">로그아웃</button></li>`
+    ? `<li class="bw-nav-userwrap"><a href="mypage.html" ${current==='mypage.html'?'class="active"':''}>마이페이지</a><span class="bw-nav-username"><b>${escapeHtml(session.username)}</b>님</span><button class="bw-nav-logout" id="bw-logout-btn" type="button">로그아웃</button></li>`
     : '';
   const NAV = `
 <nav class="bw-nav">
