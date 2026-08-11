@@ -98,26 +98,7 @@
 #gwauri-board .google-link-btn{background:#fff;color:var(--navy);border:1px solid var(--line);padding:8px 14px;font-size:13px;}
 #gwauri-board .google-link-btn:hover{border-color:var(--navy);}
 #gwauri-board .file-size-hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
-#gwauri-board .panel-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px;margin-bottom:16px;}
-#gwauri-board .panel-title{font-size:20px;font-weight:800;margin:0 0 18px;color:var(--navy-deep);}
-#gwauri-board .info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;}
-#gwauri-board .info-row:last-child{border-bottom:none;}
-#gwauri-board .info-row b{color:var(--muted);font-weight:500;}
-#gwauri-board .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12.5px;font-weight:700;}
-#gwauri-board .badge-admin{background:#fde3e3;color:#b3432b;}
-#gwauri-board .badge-manager{background:#e3edfd;color:#1a56b3;}
-#gwauri-board .badge-user{background:#eef1f8;color:var(--muted);}
-#gwauri-board .badge-muted{background:#f3e3fd;color:#7b2fb3;margin-left:6px;}
-#gwauri-board .user-table{width:100%;border-collapse:collapse;font-size:14px;}
-#gwauri-board .user-table th,#gwauri-board .user-table td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
-#gwauri-board .user-table th{color:var(--muted);font-weight:600;font-size:13px;}
-#gwauri-board .user-actions{display:flex;gap:6px;flex-wrap:wrap;}
-#gwauri-board .user-actions button{padding:6px 10px;font-size:12.5px;border:1px solid var(--line);background:#fff;color:var(--ink);}
-#gwauri-board .user-actions button:hover{border-color:var(--navy);}
-#gwauri-board .user-actions select{font-family:inherit;font-size:12.5px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:#fff;}
 #gwauri-board .danger-btn{color:#c23b3b!important;border-color:#f0c8c8!important;}
-#gwauri-board .table-scroll{overflow-x:auto;}
-#gwauri-board .post-admin-actions{display:flex;gap:8px;margin-top:10px;}
 
 @media(max-width:600px){
   #gwauri-board .gb-body{padding:18px 14px 24px;}
@@ -156,9 +137,8 @@ const SCRIPT_URL="https://script.google.com/macros/s/AKfycbytqxpEa69WiNB8AbapQdw
 const GOOGLE_CLIENT_ID="85712692992-v7cpbmnggqokev9h34aftm33slod93ml.apps.googleusercontent.com";
 const DRIVE_FOLDER="과학구리_게시판_첨부파일";
 const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.file";
-// 2) Settings → Upload → Upload presets → Add upload preset → Signing Mode를 "Unsigned"로 설정 후 저장, 그 preset 이름을 아래에 입력
 const CLOUDINARY_CLOUD_NAME="cyu356na";
-const CLOUDINARY_UPLOAD_PRESET="jshs-us";
+const CLOUDINARY_UPLOAD_PRESET="gwakuri_board";
 const MAX_FILE_SIZE=20*1024*1024; // 구글 계정 미연동 시 1회 업로드 용량 상한(20MB)
 
 // ── 로그인 세션은 common.js(GwakuriAuth)에서 공유 ──────────────────
@@ -184,42 +164,13 @@ function isImgUrl(url,name){const c=(name||url||"").toLowerCase();return/\.(png|
 function renderUserbar(){
   if(S.user){
     const rl=S.role==="admin"?" · 관리자":S.role==="manager"?" · 매니저":"";
-    const mb=(S.role==="admin"||S.role==="manager")?`<button class="btn-userbar" id="gb-manage-btn">관리</button>`:"";
-    userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><a class="btn-userbar" href="mypage.html">마이페이지</a>${mb}</div>`;
-    const mgb=document.getElementById("gb-manage-btn");if(mgb)mgb.onclick=()=>{S.view="manage";render();};
+    userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><a class="btn-userbar" href="mypage.html">마이페이지</a></div>`;
   }else{
     userbar.innerHTML="";
   }
 }
-function render(){renderUserbar();if(S.view==="manage")return rManage();if(S.view==="write")return rWrite();if(S.view==="detail")return rDetail();return rList();}
+function render(){renderUserbar();if(S.view==="write")return rWrite();if(S.view==="detail")return rDetail();return rList();}
 
-
-// Manage
-function rManage(){
-  const isA=S.role==="admin";
-  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="panel-box"><p class="panel-title">게시글 관리</p><div id="gb-mp"><div class="loading">불러오는 중...</div></div></div>${isA?`<div class="panel-box"><p class="panel-title">회원 관리</p><div class="table-scroll"><div id="gb-mu"><div class="loading">불러오는 중...</div></div></div></div>`:""}`;
-  document.getElementById("gb-back").onclick=()=>{S.view="list";render();};
-  loadManPosts();if(isA)loadManUsers();
-}
-async function loadManPosts(){
-  const b=document.getElementById("gb-mp");if(!b)return;
-  try{const r=await call("listPosts",{});const ps=r.success?r.posts:[];
-    if(!ps.length){b.innerHTML=`<div class="empty">게시글이 없어요.</div>`;return;}
-    b.innerHTML=`<ul class="post-list">${ps.map(p=>`<li class="post-item" style="cursor:default"><p class="post-title">${escH(p.title)}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span></div><div class="post-admin-actions"><button class="btn-ghost danger-btn" data-dp="${p.id}">삭제</button></div></li>`).join("")}</ul>`;
-    b.querySelectorAll("[data-dp]").forEach(btn=>btn.onclick=async()=>{if(!confirm("삭제할까요?"))return;const r=await call("adminDeletePost",{id:btn.dataset.dp,actor:S.user});if(r.success)loadManPosts();else alert(r.message||"삭제 실패");});
-  }catch(e){b.innerHTML=`<div class="empty">불러오지 못했어요.</div>`;}
-}
-async function loadManUsers(){
-  const b=document.getElementById("gb-mu");if(!b)return;
-  try{const r=await call("listUsers",{actor:S.user});
-    if(!r.success){b.innerHTML=`<div class="empty">${escH(r.message||"불러오지 못했어요.")}</div>`;return;}
-    b.innerHTML=`<table class="user-table"><thead><tr><th>이름</th><th>가입일</th><th>권한</th><th>상태</th><th>관리</th></tr></thead><tbody>${r.users.map(u=>`<tr><td>${escH(u.username)}${u.isFounder?'<span class="badge badge-admin" style="margin-left:6px">최초</span>':""}</td><td>${fmtD(u.createdAt)}</td><td>${u.isFounder?'<span class="badge badge-admin">관리자</span>':`<select class="role-select" data-u="${escH(u.username)}"><option value="user"${u.role==="user"?" selected":""}>일반</option><option value="manager"${u.role==="manager"?" selected":""}>매니저</option><option value="admin"${u.role==="admin"?" selected":""}>관리자</option></select>`}</td><td>${u.muted?'<span class="badge badge-muted">작성금지</span>':"-"}</td><td><div class="user-actions">${u.isFounder?"":` <button data-mute="${escH(u.username)}" data-cur="${u.muted?1:0}">${u.muted?"금지해제":"작성금지"}</button><button data-rst="${escH(u.username)}">비번초기화</button><button class="danger-btn" data-kick="${escH(u.username)}">강제탈퇴</button>`}</div></td></tr>`).join("")}</tbody></table>`;
-    b.querySelectorAll(".role-select").forEach(s=>s.onchange=async()=>{const r=await call("setRole",{actor:S.user,targetUsername:s.dataset.u,newRole:s.value});if(!r.success){alert(r.message||"실패");loadManUsers();}});
-    b.querySelectorAll("[data-mute]").forEach(btn=>btn.onclick=async()=>{const r=await call("setMuted",{actor:S.user,targetUsername:btn.dataset.mute,muted:String(btn.dataset.cur==="0")});if(r.success)loadManUsers();else alert(r.message||"실패");});
-    b.querySelectorAll("[data-rst]").forEach(btn=>btn.onclick=async()=>{if(!confirm(btn.dataset.rst+"님 비밀번호를 0000으로 초기화?"))return;const r=await call("resetPassword",{actor:S.user,targetUsername:btn.dataset.rst});alert(r.message||(r.success?"완료":"실패"));});
-    b.querySelectorAll("[data-kick]").forEach(btn=>btn.onclick=async()=>{if(!confirm(btn.dataset.kick+"님을 강제 탈퇴시킬까요?"))return;const r=await call("kickUser",{actor:S.user,targetUsername:btn.dataset.kick});if(r.success)loadManUsers();else alert(r.message||"실패");});
-  }catch(e){b.innerHTML=`<div class="empty">불러오지 못했어요.</div>`;}
-}
 
 // List
 function rList(){
