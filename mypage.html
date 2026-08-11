@@ -36,6 +36,28 @@
 .mp-msg.err{color:#c23b3b;}
 .mp-msg.ok{color:#1f8a5c;}
 .mp-loading,.mp-empty{text-align:center;padding:40px 0;color:var(--muted);}
+
+.mp-post-list{list-style:none;}
+.mp-post-item{padding:14px 0;border-bottom:1px solid var(--line);}
+.mp-post-item:last-child{border-bottom:none;}
+.mp-post-title{font-weight:700;font-size:15px;margin-bottom:4px;}
+.mp-post-meta{font-size:13px;color:var(--muted);display:flex;gap:10px;margin-bottom:8px;}
+.mp-scroll{overflow-x:auto;}
+.mp-table{width:100%;border-collapse:collapse;font-size:14px;}
+.mp-table th,.mp-table td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);vertical-align:middle;white-space:nowrap;}
+.mp-table th{color:var(--muted);font-weight:600;font-size:13px;}
+.mp-user-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.mp-ghost-btn{
+  font-family:var(--ff);cursor:pointer;border-radius:8px;padding:6px 10px;
+  font-size:12.5px;font-weight:600;background:#fff;color:var(--ink);
+  border:1px solid var(--line);
+}
+.mp-ghost-btn:hover{border-color:var(--navy);}
+.mp-danger-btn{color:#c23b3b!important;border-color:#f0c8c8!important;}
+.mp-role-select{
+  font-family:var(--ff);font-size:12.5px;padding:6px 8px;border-radius:8px;
+  border:1px solid var(--line);background:#fff;color:var(--ink);
+}
 </style>
 </head>
 <body>
@@ -54,6 +76,16 @@
     <div class="mp-row"><input id="mp-np" type="password" placeholder="새 비밀번호" autocomplete="new-password"/></div>
     <button class="mp-btn" id="mp-cpb">변경하기</button>
     <div class="mp-msg" id="mp-cpm"></div>
+  </div>
+
+  <div class="mp-panel" id="mp-managepost-panel" style="display:none">
+    <p class="mp-panel-title">게시글 관리</p>
+    <div id="mp-managepost"><div class="mp-loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="mp-panel" id="mp-manageuser-panel" style="display:none">
+    <p class="mp-panel-title">회원 관리</p>
+    <div class="mp-scroll"><div id="mp-manageuser"><div class="mp-loading">불러오는 중...</div></div></div>
   </div>
 </div>
 
@@ -109,6 +141,97 @@
   });
 
   loadInfo();
+
+  // ── 관리자/매니저 전용: 게시글·회원 관리 ──────────────────────────
+  const isManager = session.role === 'admin' || session.role === 'manager';
+  const isAdmin = session.role === 'admin';
+
+  function fmtD(v){ const d = new Date(v); return isNaN(d) ? '' : `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`; }
+
+  if(isManager){
+    document.getElementById('mp-managepost-panel').style.display = '';
+    loadManagePosts();
+  }
+  if(isAdmin){
+    document.getElementById('mp-manageuser-panel').style.display = '';
+    loadManageUsers();
+  }
+
+  async function loadManagePosts(){
+    const b = document.getElementById('mp-managepost');
+    try{
+      const r = await window.GwakuriAuth.call('listPosts', {});
+      const ps = r.success ? r.posts : [];
+      if(!ps.length){ b.innerHTML = '<div class="mp-empty">게시글이 없어요.</div>'; return; }
+      b.innerHTML = `<ul class="mp-post-list">${ps.map(p=>`
+        <li class="mp-post-item">
+          <p class="mp-post-title">${escH(p.title)}</p>
+          <div class="mp-post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span></div>
+          <button class="mp-ghost-btn mp-danger-btn" data-dp="${p.id}">삭제</button>
+        </li>`).join('')}</ul>`;
+      b.querySelectorAll('[data-dp]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          if(!confirm('삭제할까요?')) return;
+          const r = await window.GwakuriAuth.call('adminDeletePost', { id: btn.dataset.dp, actor: session.username });
+          if(r.success) loadManagePosts(); else alert(r.message || '삭제 실패');
+        };
+      });
+    }catch(e){ b.innerHTML = '<div class="mp-empty">불러오지 못했어요.</div>'; }
+  }
+
+  async function loadManageUsers(){
+    const b = document.getElementById('mp-manageuser');
+    try{
+      const r = await window.GwakuriAuth.call('listUsers', { actor: session.username });
+      if(!r.success){ b.innerHTML = `<div class="mp-empty">${escH(r.message || '불러오지 못했어요.')}</div>`; return; }
+      b.innerHTML = `<table class="mp-table"><thead><tr>
+          <th>이름</th><th>가입일</th><th>권한</th><th>상태</th><th>관리</th>
+        </tr></thead><tbody>${r.users.map(u=>`
+          <tr>
+            <td>${escH(u.username)}${u.isFounder?' <span class="mp-badge mp-badge-admin">최초</span>':''}</td>
+            <td>${fmtD(u.createdAt)}</td>
+            <td>${u.isFounder
+              ? '<span class="mp-badge mp-badge-admin">관리자</span>'
+              : `<select class="mp-role-select" data-u="${escH(u.username)}">
+                   <option value="user"${u.role==='user'?' selected':''}>일반</option>
+                   <option value="manager"${u.role==='manager'?' selected':''}>매니저</option>
+                   <option value="admin"${u.role==='admin'?' selected':''}>관리자</option>
+                 </select>`}</td>
+            <td>${u.muted ? '<span class="mp-badge mp-badge-muted">작성금지</span>' : '-'}</td>
+            <td><div class="mp-user-actions">${u.isFounder ? '' : `
+              <button class="mp-ghost-btn" data-mute="${escH(u.username)}" data-cur="${u.muted?1:0}">${u.muted?'금지해제':'작성금지'}</button>
+              <button class="mp-ghost-btn" data-rst="${escH(u.username)}">비번초기화</button>
+              <button class="mp-ghost-btn mp-danger-btn" data-kick="${escH(u.username)}">강제탈퇴</button>`}</div></td>
+          </tr>`).join('')}</tbody></table>`;
+
+      b.querySelectorAll('.mp-role-select').forEach(s=>{
+        s.onchange = async ()=>{
+          const r = await window.GwakuriAuth.call('setRole', { actor: session.username, targetUsername: s.dataset.u, newRole: s.value });
+          if(!r.success){ alert(r.message || '실패'); loadManageUsers(); }
+        };
+      });
+      b.querySelectorAll('[data-mute]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          const r = await window.GwakuriAuth.call('setMuted', { actor: session.username, targetUsername: btn.dataset.mute, muted: String(btn.dataset.cur==='0') });
+          if(r.success) loadManageUsers(); else alert(r.message || '실패');
+        };
+      });
+      b.querySelectorAll('[data-rst]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          if(!confirm(btn.dataset.rst + '님 비밀번호를 0000으로 초기화?')) return;
+          const r = await window.GwakuriAuth.call('resetPassword', { actor: session.username, targetUsername: btn.dataset.rst });
+          alert(r.message || (r.success ? '완료' : '실패'));
+        };
+      });
+      b.querySelectorAll('[data-kick]').forEach(btn=>{
+        btn.onclick = async ()=>{
+          if(!confirm(btn.dataset.kick + '님을 강제 탈퇴시킬까요?')) return;
+          const r = await window.GwakuriAuth.call('kickUser', { actor: session.username, targetUsername: btn.dataset.kick });
+          if(r.success) loadManageUsers(); else alert(r.message || '실패');
+        };
+      });
+    }catch(e){ b.innerHTML = '<div class="mp-empty">불러오지 못했어요.</div>'; }
+  }
 })();
 </script>
 </body>
