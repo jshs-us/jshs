@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>html{visibility:hidden}</style>
+<title>벌금 관리 — 1-3반</title>
+<style>
+/* ── 게시판(#gwauri-board)과 동일한 톤으로 scoped ── */
+#gwauri-fine *{box-sizing:border-box;}
+#gwauri-fine{
+  --navy:#091f62;--navy-deep:#061442;--yellow:#ffec00;
+  --paper:#f4f6fb;--card:#ffffff;--line:#dfe3ee;--ink:#1b1f2e;--muted:#6b7080;
+  font-family:"Pretendard",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  background:var(--paper);color:var(--ink);font-size:18px;
+  border-radius:20px;overflow:hidden;
+  box-shadow:0 1px 3px rgba(9,31,98,.08),0 12px 32px rgba(9,31,98,.06);
+  border:1px solid var(--line);
+}
+#gwauri-fine button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:600;transition:transform .12s,opacity .15s,background .15s,border-color .15s;}
+#gwauri-fine button:active{transform:scale(.97);}
+#gwauri-fine button:disabled{opacity:.55;cursor:default;transform:none;}
+#gwauri-fine .btn-primary{background:var(--yellow);color:var(--navy-deep);}
+#gwauri-fine .btn-primary:hover{filter:brightness(.96);}
+#gwauri-fine .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--line);}
+#gwauri-fine .btn-ghost:hover{border-color:var(--navy);color:var(--navy);}
+#gwauri-fine .btn-ok{background:#eafaf1;color:#1f8a5c;border:1px solid #b9e6cc;}
+#gwauri-fine .btn-ok:hover{background:#d9f5e6;}
+#gwauri-fine .btn-danger{background:#fdeaea;color:#c23b3b;border:1px solid #f0c8c8;}
+#gwauri-fine .btn-danger:hover{background:#fadada;}
+#gwauri-fine .fn-body{padding:30px 36px 38px;}
+#gwauri-fine input,#gwauri-fine textarea,#gwauri-fine select{font-family:inherit;width:100%;border:1.5px solid var(--line);border-radius:10px;padding:13px 15px;font-size:15.5px;background:#fbfcfe;color:var(--ink);}
+#gwauri-fine input:focus,#gwauri-fine textarea:focus,#gwauri-fine select:focus{outline:none;border-color:var(--navy);background:#fff;}
+#gwauri-fine .msg{font-size:14px;margin-top:10px;min-height:17px;}
+#gwauri-fine .msg.err{color:#c23b3b;}
+#gwauri-fine .msg.ok{color:#1f8a5c;}
+#gwauri-fine .loading,#gwauri-fine .empty{text-align:center;color:var(--muted);font-size:15px;padding:56px 0;}
+#gwauri-fine .empty{background:var(--card);border:1px dashed var(--line);border-radius:14px;}
+
+/* 상단 요약 카드 (학생용) */
+.fn-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:26px;}
+.fn-sum-card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center;}
+.fn-sum-card .num{font-size:24px;font-weight:900;color:var(--navy-deep);}
+.fn-sum-card.warn .num{color:#c23b3b;}
+.fn-sum-card .lbl{font-size:12.5px;color:var(--muted);margin-top:4px;font-weight:600;}
+
+/* 부과 폼 (관리자용) */
+.fn-create-box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px 28px;margin-bottom:26px;}
+.fn-create-box h3{font-size:16px;font-weight:800;color:var(--navy-deep);margin-bottom:16px;}
+.fn-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.fn-form-grid .full{grid-column:1/-1;}
+@media(max-width:560px){.fn-form-grid{grid-template-columns:1fr;}}
+.fn-create-actions{display:flex;justify-content:flex-end;margin-top:6px;}
+
+/* 필터 탭 */
+.fn-tabs{display:flex;gap:6px;margin-bottom:18px;background:var(--paper);border-radius:10px;padding:4px;max-width:460px;}
+.fn-tab{flex:1;font-family:var(--ff);border:none;background:transparent;padding:9px 4px;border-radius:8px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:.15s;white-space:nowrap;}
+.fn-tab.active{background:#fff;color:var(--navy);box-shadow:0 1px 3px rgba(9,31,98,.12);}
+
+/* 리스트 */
+.fn-list{list-style:none;margin:0;padding:0;}
+.fn-item{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:20px 22px;margin-bottom:12px;position:relative;}
+.fn-item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.fn-item-main .reason{font-size:17px;font-weight:700;color:var(--ink);margin-bottom:6px;}
+.fn-item-main .meta{font-size:13.5px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap;}
+.fn-item-main .meta b{color:var(--ink);}
+.fn-amount{font-size:19px;font-weight:900;color:var(--navy-deep);white-space:nowrap;}
+.fn-badge{display:inline-block;font-size:12px;font-weight:800;padding:4px 11px;border-radius:20px;letter-spacing:.02em;}
+.fn-badge.unpaid{background:#fdeaea;color:#c23b3b;}
+.fn-badge.pending{background:#fff8db;color:#8a6d00;}
+.fn-badge.paid{background:#eafaf1;color:#1f8a5c;}
+.fn-item-actions{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;align-items:center;}
+.fn-proof-thumb{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line);}
+.fn-proof-thumb img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer;}
+.fn-proof-thumb .fn-proof-info{font-size:13px;color:var(--muted);}
+.fn-file-picker-btn{background:#eef1f8;color:var(--navy);border:1.5px dashed var(--line);width:auto;text-align:left;font-weight:500;font-size:14px;padding:10px 16px;}
+.fn-file-picker-btn:hover{border-color:var(--navy);}
+
+/* 사진 라이트박스 */
+.fn-lightbox{position:fixed;inset:0;z-index:99999;background:rgba(6,20,66,.88);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;}
+.fn-lightbox img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.4);}
+
+.fn-noaccess{text-align:center;padding:60px 20px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="bw-page">
+  <h1 class="bw-page-title">💰 벌금 관리</h1>
+  <p class="bw-page-sub" id="fn-sub">명찰 미착용, 복장 불량 등 규정 위반 벌금을 확인하고 납부 인증을 올릴 수 있어요.</p>
+
+  <div id="gwauri-fine"><div class="fn-body"><div class="loading">불러오는 중...</div></div></div>
+</div>
+
+<script src="common.js"></script>
+<script>
+(function(){
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbz3KMpWYl78ieQZypV1y8Vdx45Em5wC12PYWJqhICMesng1X3t7nWaI6ozGuLKy5WrH8A/exec";
+const CLOUDINARY_CLOUD_NAME="acj4zb2u";
+const CLOUDINARY_UPLOAD_PRESET="jshsfine";
+const MAX_FILE_SIZE=15*1024*1024; // 인증사진 용량 상한(15MB)
+
+// 벌금 관리자 (요청자 이름 기준 — 실제 권한 검증은 서버(Apps Script)에서도 동일 목록으로 반드시 체크해야 함)
+const FINE_ADMINS=["서준혁","정의찬"];
+
+function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
+function escH(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML;}
+function fmtW(n){return Number(n||0).toLocaleString("ko-KR")+"원";}
+function fmtDate(s){if(!s)return"";const d=new Date(s);if(isNaN(d))return String(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;}
+function badge(status){
+  const map={"미납":["unpaid","미납"],"확인대기":["pending","확인대기"],"완납":["paid","완납"]};
+  const [cls,label]=map[status]||["unpaid",status];
+  return `<span class="fn-badge ${cls}">${label}</span>`;
+}
+
+const _session=(window.GwakuriAuth&&window.GwakuriAuth.getSession())||null;
+const S={user:_session?_session.username:null,isFineAdmin:_session?FINE_ADMINS.includes(_session.username):false,fines:[],filter:"all",uploadingId:null};
+
+const root=document.getElementById("gwauri-fine");
+
+async function init(){
+  if(!S.user){
+    root.innerHTML=`<div class="fn-body"><div class="fn-noaccess">로그인 후 이용할 수 있어요.</div></div>`;
+    return;
+  }
+  document.getElementById("fn-sub").textContent = S.isFineAdmin
+    ? "벌금관리자 권한으로 접속했습니다. 학생에게 벌금을 부과하고 납부 확인을 처리할 수 있어요."
+    : "내가 부과받은 벌금 목록이에요. 납부 후 인증사진을 올려주세요.";
+  await load();
+}
+
+async function load(){
+  root.innerHTML=`<div class="fn-body"><div class="loading">불러오는 중...</div></div>`;
+  try{
+    const r = S.isFineAdmin
+      ? await call("fineListAll",{actor:S.user})
+      : await call("fineListMine",{actor:S.user});
+    if(!r.success){root.innerHTML=`<div class="fn-body"><div class="empty">${escH(r.message||"불러오기 실패")}</div></div>`;return;}
+    S.fines = r.fines||[];
+    render();
+  }catch(e){
+    root.innerHTML=`<div class="fn-body"><div class="empty">서버에 연결하지 못했어요.<br>잠시 후 다시 시도해주세요.</div></div>`;
+  }
+}
+
+function render(){
+  root.innerHTML = S.isFineAdmin ? renderAdmin() : renderStudent();
+  if(S.isFineAdmin) bindAdmin(); else bindStudent();
+}
+
+/* ───────── 학생 화면 ───────── */
+function renderStudent(){
+  const my = S.fines;
+  const unpaidCount = my.filter(f=>f.status==="미납").length;
+  const pendingCount = my.filter(f=>f.status==="확인대기").length;
+  const totalUnpaid = my.filter(f=>f.status!=="완납").reduce((s,f)=>s+Number(f.amount||0),0);
+
+  const summary = `
+    <div class="fn-summary">
+      <div class="fn-sum-card ${unpaidCount>0?'warn':''}"><div class="num">${unpaidCount}</div><div class="lbl">미납 건수</div></div>
+      <div class="fn-sum-card"><div class="num">${pendingCount}</div><div class="lbl">확인대기</div></div>
+      <div class="fn-sum-card ${totalUnpaid>0?'warn':''}"><div class="num">${fmtW(totalUnpaid)}</div><div class="lbl">미납 합계</div></div>
+    </div>`;
+
+  if(!my.length) return `<div class="fn-body">${summary}<div class="empty">아직 부과된 벌금이 없어요 🎉</div></div>`;
+
+  const items = my.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).map(f=>`
+    <li class="fn-item" data-id="${escH(f.id)}">
+      <div class="fn-item-top">
+        <div class="fn-item-main">
+          <div class="reason">${escH(f.reason)}</div>
+          <div class="meta"><span>📅 ${fmtDate(f.createdAt)}</span><span>👤 부과자: <b>${escH(f.createdBy)}</b></span></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="fn-amount">${fmtW(f.amount)}</div>
+          <div style="margin-top:6px;">${badge(f.status)}</div>
+        </div>
+      </div>
+      ${f.proofUrl ? `
+        <div class="fn-proof-thumb">
+          <img src="${escH(f.proofUrl)}" alt="납부 인증사진" class="fn-proof-view" data-url="${escH(f.proofUrl)}"/>
+          <div class="fn-proof-info">${f.status==="완납" ? "✅ 관리자 확인 완료" : "⏳ 관리자 확인을 기다리는 중이에요."}</div>
+        </div>` : ``}
+      ${f.status==="미납" ? `
+        <div class="fn-item-actions">
+          <button class="btn-primary fn-upload-btn" type="button" data-id="${escH(f.id)}">📎 납부 인증사진 올리기</button>
+          <input type="file" accept="image/*" class="fn-file-input" data-id="${escH(f.id)}" style="display:none"/>
+        </div>
+        <div class="msg" id="fn-msg-${escH(f.id)}"></div>` : ``}
+    </li>`).join("");
+
+  return `<div class="fn-body">${summary}<ul class="fn-list">${items}</ul></div>`;
+}
+
+function bindStudent(){
+  root.querySelectorAll(".fn-proof-view").forEach(img=>{
+    img.onclick=()=>openLightbox(img.dataset.url);
+  });
+  root.querySelectorAll(".fn-upload-btn").forEach(btn=>{
+    btn.onclick=()=>{
+      const id=btn.dataset.id;
+      root.querySelector(`.fn-file-input[data-id="${CSS.escape(id)}"]`).click();
+    };
+  });
+  root.querySelectorAll(".fn-file-input").forEach(inp=>{
+    inp.onchange=async ()=>{
+      const id=inp.dataset.id;
+      const file=inp.files[0];
+      if(!file)return;
+      const msgEl=document.getElementById(`fn-msg-${id}`);
+      if(!file.type.startsWith("image/")){msgEl.textContent="이미지 파일만 올릴 수 있어요.";msgEl.className="msg err";return;}
+      if(file.size>MAX_FILE_SIZE){msgEl.textContent=`${(MAX_FILE_SIZE/1024/1024).toFixed(0)}MB 이하 이미지만 올릴 수 있어요.`;msgEl.className="msg err";return;}
+      const btn=root.querySelector(`.fn-upload-btn[data-id="${CSS.escape(id)}"]`);
+      btn.disabled=true;
+      msgEl.textContent="업로드 중...";msgEl.className="msg";
+      try{
+        const up=await uploadCloudinary(file,p=>{msgEl.textContent=`업로드 중... ${p}%`;});
+        const r=await call("fineSubmitProof",{actor:S.user,id,proofUrl:up.fileUrl});
+        if(r.success){msgEl.textContent="제출 완료! 관리자 확인을 기다려주세요.";msgEl.className="msg ok";await load();}
+        else{msgEl.textContent=r.message||"제출 실패";msgEl.className="msg err";btn.disabled=false;}
+      }catch(e){
+        msgEl.textContent="업로드 실패: "+(e&&e.message?e.message:"오류");msgEl.className="msg err";btn.disabled=false;
+      }
+    };
+  });
+}
+
+/* ───────── 관리자(벌금관리자) 화면 ───────── */
+function renderAdmin(){
+  const createForm = `
+    <div class="fn-create-box">
+      <h3>➕ 벌금 부과하기</h3>
+      <div class="fn-form-grid">
+        <input id="fn-c-student" type="text" placeholder="학생 이름 (예: 홍길동)"/>
+        <input id="fn-c-amount" type="number" placeholder="금액 (원)" min="0" step="100"/>
+        <div class="full">
+          <input id="fn-c-reason" type="text" placeholder="사유 (예: 명찰 미착용, 복장 불량)" list="fn-reason-list"/>
+          <datalist id="fn-reason-list">
+            <option value="명찰 미착용"></option>
+            <option value="복장 불량"></option>
+            <option value="실내화 미착용"></option>
+            <option value="지각"></option>
+          </datalist>
+        </div>
+      </div>
+      <div class="fn-create-actions">
+        <button class="btn-primary" id="fn-c-submit" type="button">벌금 부과</button>
+      </div>
+      <div class="msg" id="fn-c-msg"></div>
+    </div>`;
+
+  const tabs = `
+    <div class="fn-tabs">
+      <button class="fn-tab ${S.filter==='all'?'active':''}" data-f="all">전체</button>
+      <button class="fn-tab ${S.filter==='미납'?'active':''}" data-f="미납">미납</button>
+      <button class="fn-tab ${S.filter==='확인대기'?'active':''}" data-f="확인대기">확인대기</button>
+      <button class="fn-tab ${S.filter==='완납'?'active':''}" data-f="완납">완납</button>
+    </div>`;
+
+  const filtered = S.filter==='all' ? S.fines : S.fines.filter(f=>f.status===S.filter);
+  const sorted = filtered.slice().sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt));
+
+  const list = !sorted.length ? `<div class="empty">해당하는 벌금 내역이 없어요.</div>` : `<ul class="fn-list">${sorted.map(f=>`
+    <li class="fn-item" data-id="${escH(f.id)}">
+      <div class="fn-item-top">
+        <div class="fn-item-main">
+          <div class="reason">${escH(f.student)} · ${escH(f.reason)}</div>
+          <div class="meta"><span>📅 ${fmtDate(f.createdAt)}</span><span>👤 부과자: <b>${escH(f.createdBy)}</b></span></div>
+        </div>
+        <div style="text-align:right;">
+          <div class="fn-amount">${fmtW(f.amount)}</div>
+          <div style="margin-top:6px;">${badge(f.status)}</div>
+        </div>
+      </div>
+      ${f.proofUrl ? `
+        <div class="fn-proof-thumb">
+          <img src="${escH(f.proofUrl)}" alt="납부 인증사진" class="fn-proof-view" data-url="${escH(f.proofUrl)}"/>
+          <div class="fn-proof-info">학생이 인증사진을 제출했어요. 확인 후 아래 버튼으로 처리해주세요.</div>
+        </div>` : `<div class="fn-proof-thumb" style="border-top:1px solid var(--line);padding-top:12px;margin-top:12px;"><div class="fn-proof-info">아직 인증사진이 제출되지 않았어요.</div></div>`}
+      <div class="fn-item-actions">
+        ${f.status!=="완납" ? `<button class="btn-ok fn-status-btn" data-id="${escH(f.id)}" data-status="완납" type="button">✅ 완납 처리</button>` : ``}
+        ${f.status!=="미납" ? `<button class="btn-ghost fn-status-btn" data-id="${escH(f.id)}" data-status="미납" type="button">↩︎ 미납으로 되돌리기</button>` : ``}
+      </div>
+      <div class="msg" id="fn-amsg-${escH(f.id)}"></div>
+    </li>`).join("")}</ul>`;
+
+  return `<div class="fn-body">${createForm}${tabs}${list}</div>`;
+}
+
+function bindAdmin(){
+  root.querySelectorAll(".fn-proof-view").forEach(img=>{ img.onclick=()=>openLightbox(img.dataset.url); });
+  root.querySelectorAll(".fn-tab").forEach(t=>{
+    t.onclick=()=>{ S.filter=t.dataset.f; render(); };
+  });
+  const submitBtn=document.getElementById("fn-c-submit");
+  submitBtn.onclick=async ()=>{
+    const student=document.getElementById("fn-c-student").value.trim();
+    const reason=document.getElementById("fn-c-reason").value.trim();
+    const amount=document.getElementById("fn-c-amount").value;
+    const msgEl=document.getElementById("fn-c-msg");
+    if(!student||!reason||!amount){msgEl.textContent="학생 이름, 사유, 금액을 모두 입력해주세요.";msgEl.className="msg err";return;}
+    if(Number(amount)<=0){msgEl.textContent="금액은 0보다 커야 해요.";msgEl.className="msg err";return;}
+    submitBtn.disabled=true;
+    msgEl.textContent="부과하는 중...";msgEl.className="msg";
+    try{
+      const r=await call("fineCreate",{actor:S.user,student,reason,amount});
+      if(r.success){
+        msgEl.textContent=`${student} 학생에게 벌금이 부과되었어요.`;msgEl.className="msg ok";
+        document.getElementById("fn-c-student").value="";
+        document.getElementById("fn-c-reason").value="";
+        document.getElementById("fn-c-amount").value="";
+        await load();
+      }else{msgEl.textContent=r.message||"부과 실패";msgEl.className="msg err";}
+    }catch(e){ msgEl.textContent="서버 연결 실패"; msgEl.className="msg err"; }
+    submitBtn.disabled=false;
+  };
+  root.querySelectorAll(".fn-status-btn").forEach(btn=>{
+    btn.onclick=async ()=>{
+      const id=btn.dataset.id, status=btn.dataset.status;
+      const msgEl=document.getElementById(`fn-amsg-${id}`);
+      btn.disabled=true;
+      try{
+        const r=await call("fineUpdateStatus",{actor:S.user,id,status});
+        if(r.success){ await load(); }
+        else{ msgEl.textContent=r.message||"처리 실패"; msgEl.className="msg err"; btn.disabled=false; }
+      }catch(e){ msgEl.textContent="서버 연결 실패"; msgEl.className="msg err"; btn.disabled=false; }
+    };
+  });
+}
+
+/* ───────── 공통: 라이트박스 & Cloudinary 업로드 ───────── */
+function openLightbox(url){
+  const box=document.createElement("div");
+  box.className="fn-lightbox";
+  box.innerHTML=`<img src="${escH(url)}" alt="인증사진 확대"/>`;
+  box.onclick=()=>box.remove();
+  document.body.appendChild(box);
+}
+
+function uploadCloudinary(file,onP){
+  return new Promise((res,rej)=>{
+    if(!CLOUDINARY_CLOUD_NAME||!CLOUDINARY_UPLOAD_PRESET){rej(new Error("업로드 저장소 설정이 안 되어 있어요."));return;}
+    const fd=new FormData();
+    fd.append("file",file);
+    fd.append("upload_preset",CLOUDINARY_UPLOAD_PRESET);
+    const x=new XMLHttpRequest();
+    x.open("POST",`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,true);
+    x.upload.onprogress=e=>{ if(e.lengthComputable&&onP) onP(Math.round(e.loaded/e.total*100)); };
+    x.onload=()=>{
+      if(x.status>=200&&x.status<300){
+        try{const j=JSON.parse(x.responseText);res({fileUrl:j.secure_url,fileName:file.name});}
+        catch(e){rej(new Error("응답 처리 실패"));}
+      }else{
+        let msg="업로드 실패 ("+x.status+")";
+        try{const j=JSON.parse(x.responseText);if(j&&j.error&&j.error.message)msg=j.error.message;}catch(e){}
+        rej(new Error(msg));
+      }
+    };
+    x.onerror=()=>rej(new Error("네트워크 오류"));
+    x.send(fd);
+  });
+}
+
+init();
+})();
+</script>
+</body>
+</html>
