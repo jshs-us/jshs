@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>html{visibility:hidden}</style>
 <title>게시판 — 1-3반</title>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 .board-wrap{max-width:960px;margin:0 auto;padding:32px 22px 60px;}
 .board-crumb{font-size:13px;color:var(--muted);margin-bottom:20px;display:flex;align-items:center;gap:6px;}
@@ -93,10 +92,6 @@
 #gwauri-board .comment-form{display:flex;gap:10px;margin-top:16px;align-items:flex-start;}
 #gwauri-board .comment-form textarea{min-height:52px;resize:vertical;}
 #gwauri-board .comment-empty{text-align:center;color:var(--muted);font-size:14px;padding:20px 0;}
-#gwauri-board .google-link-box{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#eef1f8;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;}
-#gwauri-board .google-link-box.linked{background:#eafaf1;border-color:#b9e6cc;color:#1f8a5c;}
-#gwauri-board .google-link-btn{background:#fff;color:var(--navy);border:1px solid var(--line);padding:8px 14px;font-size:13px;}
-#gwauri-board .google-link-btn:hover{border-color:var(--navy);}
 #gwauri-board .file-size-hint{font-size:12.5px;color:var(--muted);margin-top:6px;}
 #gwauri-board .danger-btn{color:#c23b3b!important;border-color:#f0c8c8!important;}
 
@@ -134,23 +129,14 @@
 <script>
 (function(){
 const SCRIPT_URL="https://script.google.com/macros/s/AKfycbytqxpEa69WiNB8AbapQdwo2jbNNzFJvI5fThDEAuLc9MCMeVHCUP7j6lJdvH1tBaTA2Q/exec";
-const GOOGLE_CLIENT_ID="85712692992-v7cpbmnggqokev9h34aftm33slod93ml.apps.googleusercontent.com";
-const DRIVE_FOLDER="과학구리_게시판_첨부파일";
-const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.file";
+// ── 사진/파일 업로드: Cloudinary ──────────────────
 const CLOUDINARY_CLOUD_NAME="cyu356na";
 const CLOUDINARY_UPLOAD_PRESET="gwakuri_board";
-const MAX_FILE_SIZE=20*1024*1024; // 구글 계정 미연동 시 1회 업로드 용량 상한(20MB)
+const MAX_FILE_SIZE=50*1024*1024; // 1회 업로드 용량 상한(50MB). 실제 상한은 Cloudinary 계정 플랜(무료 플랜은 이미지/일반파일 10MB, 동영상 100MB)을 따름
 
 // ── 로그인 세션은 common.js(GwakuriAuth)에서 공유 ──────────────────
 const _session=(window.GwakuriAuth&&window.GwakuriAuth.getSession())||null;
 let S={user:_session?_session.username:null,role:_session?_session.role:null,muted:_session?!!_session.muted:false,view:"list",posts:[],currentPost:null,comments:[],selectedFile:null,uploading:false,adminUsers:[]};
-let gToken=null,gTokenClient=null,gLinked=false;
-
-function initG(){
-  if(gTokenClient||typeof google==="undefined"||!google.accounts)return;
-  gTokenClient=google.accounts.oauth2.initTokenClient({client_id:GOOGLE_CLIENT_ID,scope:DRIVE_SCOPE,callback:(r)=>{if(r&&r.access_token){gToken=r.access_token;gLinked=true;render();}}});
-}
-function linkG(){initG();if(!gTokenClient){alert("구글 연동이 설정되지 않았어요.");return;}gTokenClient.requestAccessToken();}
 
 const app=document.getElementById("gb-app"),userbar=document.getElementById("gb-userbar");
 function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
@@ -183,20 +169,18 @@ function rList(){
 // Write
 function rWrite(){
   if(S.muted){app.innerHTML=`<div class="write-box"><div class="empty">게시글 작성이 제한된 계정이에요.</div><div class="write-actions"><button class="btn-ghost" id="gb-cancel">목록으로</button></div></div>`;document.getElementById("gb-cancel").onclick=()=>{S.view="list";render();};return;}
-  initG();
-  const lbh=gLinked?`<div class="google-link-box linked">✅ 구글 계정 연동됨 — 대용량 파일도 가능해요.</div>`:`<div class="google-link-box"><span>구글 계정을 연동하면 대용량 파일도 올릴 수 있어요.</span><button class="google-link-btn" id="gb-gl">구글 계정 연동</button></div>`;
-  app.innerHTML=`<div class="write-box">${lbh}<input id="gb-ti" type="text" placeholder="제목"/><textarea id="gb-co" placeholder="내용을 입력하세요"></textarea><div class="file-row" id="gb-fr"></div><div class="write-actions"><button class="btn-ghost" id="gb-cancel">취소</button><button class="btn-primary" id="gb-sub">등록</button></div><div class="msg" id="gb-wm"></div></div>`;
+  app.innerHTML=`<div class="write-box"><input id="gb-ti" type="text" placeholder="제목"/><textarea id="gb-co" placeholder="내용을 입력하세요"></textarea><div class="file-row" id="gb-fr"></div><div class="write-actions"><button class="btn-ghost" id="gb-cancel">취소</button><button class="btn-primary" id="gb-sub">등록</button></div><div class="msg" id="gb-wm"></div></div>`;
   renderFP();
-  const gb=document.getElementById("gb-gl");if(gb)gb.onclick=linkG;
   document.getElementById("gb-cancel").onclick=()=>{S.selectedFile=null;S.view="list";render();};
   document.getElementById("gb-sub").onclick=async()=>{
     const ti=document.getElementById("gb-ti").value.trim(),co=document.getElementById("gb-co").value.trim(),m=document.getElementById("gb-wm");
     if(!ti||!co){m.textContent="제목과 내용을 모두 입력해주세요.";m.className="msg err";return;}
     let fu="",fn="";
-    if(S.selectedFile){const f=S.selectedFile.file;try{
-      if(gLinked&&gToken){m.textContent="업로드 중... (구글 드라이브)";m.className="msg";const up=await uploadGD(f,p=>{m.textContent=`업로드 중... ${p}%`;});fu=up.url;fn=up.name;}
-      else{if(f.size>MAX_FILE_SIZE){m.textContent=`${fmtB(MAX_FILE_SIZE)} 초과 파일은 구글 계정 연동 후 올릴 수 있어요.`;m.className="msg err";return;}m.textContent="업로드 중...";m.className="msg";const up=await uploadCloudinary(f,p=>{m.textContent=`업로드 중... ${p}%`;});fu=up.fileUrl;fn=up.fileName;}
-    }catch(e){m.textContent="파일 업로드 실패: "+(e&&e.message?e.message:"오류");m.className="msg err";return;}}
+    if(S.selectedFile){const f=S.selectedFile.file;
+      if(f.size>MAX_FILE_SIZE){m.textContent=`${fmtB(MAX_FILE_SIZE)} 초과 파일은 올릴 수 없어요.`;m.className="msg err";return;}
+      try{m.textContent="업로드 중...";m.className="msg";const up=await uploadCloudinary(f,p=>{m.textContent=`업로드 중... ${p}%`;});fu=up.fileUrl;fn=up.fileName;}
+      catch(e){m.textContent="파일 업로드 실패: "+(e&&e.message?e.message:"오류");m.className="msg err";return;}
+    }
     m.textContent="등록 중...";m.className="msg";
     try{const pa={title:ti,content:co,author:S.user};if(fu){pa.fileUrlDirect=fu;pa.fileNameDirect=fn;}
       const r=await call("createPostDirect",pa);
@@ -207,7 +191,7 @@ function rWrite(){
 function renderFP(){
   const row=document.getElementById("gb-fr");if(!row)return;
   if(!S.selectedFile){
-    row.innerHTML=`<button class="file-picker-btn" id="gb-pf" type="button">📎 사진 또는 파일 첨부</button><input type="file" id="gb-fi" style="display:none"/><div class="file-size-hint">${gLinked?"구글 연동됨: 대용량 가능":`연동 전: ${fmtB(MAX_FILE_SIZE)} 이하`}</div>`;
+    row.innerHTML=`<button class="file-picker-btn" id="gb-pf" type="button">📎 사진 또는 파일 첨부</button><input type="file" id="gb-fi" style="display:none"/><div class="file-size-hint">${fmtB(MAX_FILE_SIZE)} 이하 파일만 업로드할 수 있어요.</div>`;
     document.getElementById("gb-pf").onclick=()=>document.getElementById("gb-fi").click();
     document.getElementById("gb-fi").onchange=e=>{const f=e.target.files[0];if(!f)return;const img=isImg(f);S.selectedFile={file:f,previewUrl:img?URL.createObjectURL(f):null,isImage:img};renderFP();};
   }else{
@@ -232,25 +216,15 @@ function uploadCloudinary(file,onP){
       if(x.status>=200&&x.status<300){
         try{const j=JSON.parse(x.responseText);res({fileUrl:j.secure_url,fileName:file.name});}
         catch(e){rej(new Error("응답 처리 실패"));}
-      }else rej(new Error("업로드 실패 ("+x.status+")"));
+      }else{
+        let msg="업로드 실패 ("+x.status+")";
+        try{const j=JSON.parse(x.responseText);if(j&&j.error&&j.error.message)msg=j.error.message;}catch(e){}
+        rej(new Error(msg));
+      }
     };
     x.onerror=()=>rej(new Error("네트워크 오류"));
     x.send(fd);
   });
-}
-async function uploadGD(file,onP){
-  let fid=null;
-  const q=encodeURIComponent(`name='${DRIVE_FOLDER.replace(/'/g,"\\'")}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
-  const sr=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id)`,{headers:{"Authorization":"Bearer "+gToken}});
-  const sd=await sr.json();
-  if(sd.files&&sd.files.length)fid=sd.files[0].id;
-  else{const cr=await fetch("https://www.googleapis.com/drive/v3/files",{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json"},body:JSON.stringify({name:DRIVE_FOLDER,mimeType:"application/vnd.google-apps.folder"})});fid=(await cr.json()).id;}
-  const ir=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable",{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json; charset=UTF-8","X-Upload-Content-Type":file.type||"application/octet-stream"},body:JSON.stringify({name:file.name,parents:[fid]})});
-  if(!ir.ok)throw new Error("업로드 세션 시작 실패");
-  const uploadUrl=ir.headers.get("Location");if(!uploadUrl)throw new Error("업로드 URL 없음");
-  const fileId=await new Promise((res,rej)=>{const x=new XMLHttpRequest();x.open("PUT",uploadUrl,true);x.setRequestHeader("Content-Type",file.type||"application/octet-stream");x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};x.onload=()=>{if(x.status>=200&&x.status<300){try{res(JSON.parse(x.responseText).id);}catch{rej(new Error("응답 처리 실패"));}}else rej(new Error("업로드 실패 ("+x.status+")"));};x.onerror=()=>rej(new Error("네트워크 오류"));x.send(file);});
-  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,{method:"POST",headers:{"Authorization":"Bearer "+gToken,"Content-Type":"application/json"},body:JSON.stringify({role:"reader",type:"anyone"})});
-  return{url:`https://drive.google.com/file/d/${fileId}/view`,name:file.name};
 }
 
 // Detail
