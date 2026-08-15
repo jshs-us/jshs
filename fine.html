@@ -86,7 +86,7 @@
 <body>
 <div class="bw-page">
   <h1 class="bw-page-title">💰 벌금 관리</h1>
-  <p class="bw-page-sub" id="fn-sub">명찰 미착용, 복장 불량 등 규정 위반 벌금을 확인하고 납부 인증을 올릴 수 있어요.</p>
+  <p class="bw-page-sub" id="fn-sub">규정 위반 벌금을 확인하고 납부 인증을 올릴 수 있어요.</p>
 
   <div id="gwauri-fine"><div class="fn-body"><div class="loading">불러오는 중...</div></div></div>
 </div>
@@ -104,7 +104,7 @@ const FINE_ADMINS=["서준혁","정의찬"];
 
 function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
 function escH(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML;}
-function fmtW(n){return Number(n||0).toLocaleString("ko-KR")+"원";}
+function fmtW(n){return "$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(s){if(!s)return"";const d=new Date(s);if(isNaN(d))return String(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;}
 function badge(status){
   const map={"미납":["unpaid","미납"],"확인대기":["pending","확인대기"],"완납":["paid","완납"]};
@@ -231,15 +231,9 @@ function renderAdmin(){
       <h3>➕ 벌금 부과하기</h3>
       <div class="fn-form-grid">
         <input id="fn-c-student" type="text" placeholder="학생 이름 (예: 홍길동)"/>
-        <input id="fn-c-amount" type="number" placeholder="금액 (원)" min="0" step="100"/>
+        <input id="fn-c-amount" type="number" placeholder="금액 ($)" min="0" step="0.25"/>
         <div class="full">
-          <input id="fn-c-reason" type="text" placeholder="사유 (예: 명찰 미착용, 복장 불량)" list="fn-reason-list"/>
-          <datalist id="fn-reason-list">
-            <option value="명찰 미착용"></option>
-            <option value="복장 불량"></option>
-            <option value="실내화 미착용"></option>
-            <option value="지각"></option>
-          </datalist>
+          <input id="fn-c-reason" type="text" placeholder="사유"/>
         </div>
       </div>
       <div class="fn-create-actions">
