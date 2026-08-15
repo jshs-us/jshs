@@ -217,7 +217,7 @@
     // FOOTER
     const FOOT=`
   <footer class="bw-footer">
-    1-3반 정보 제공 사이트 &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Juvnxyk</strong>
+    1-3반 정보 제공 사이트 &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
     &nbsp;&nbsp;|&nbsp;&nbsp;
     문의: <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a>
   </footer>`;
@@ -238,7 +238,7 @@
     } else {
       revealPage();
     }
-
+    
     function revealPage(){
       document.documentElement.style.visibility = 'visible';
     }
