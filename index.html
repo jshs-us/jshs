@@ -2,9 +2,9 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
 <style>html{visibility:hidden}</style>
-<title>1-3반 정보 제공 앱</title>
+<title>1-3반</title>
 <style>
 /* ── HERO ── */
 .bw-hero{
@@ -116,7 +116,7 @@
 <section class="bw-hero">
   <img src="logo.png" alt="전남과학고 로고" style="width:100px;height:100px;object-fit:contain;border-radius:50%;background:rgba(255,255,255,0.12);padding:8px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.25);"/>
   <h1>반갑습니다,</h1>
-  <p class="bw-hero-sub">1-3반 정보 제공 앱입니다.</p>
+  <p class="bw-hero-sub" id="bw-hero-sub"></p>
   <p class="bw-hero-credit">Made by Jvnxyk</p>
   <div class="bw-section-nav">
     <a href="homework.html"  class="bw-snav-btn">📚 과제</a>
@@ -150,8 +150,18 @@
 
 <div style="height:60px;"></div>
 
+<script src="native-bridge.js"></script>
 <script src="common.js"></script>
 <script>
+// ── 앱/사이트 여부에 따라 문구 자동 설정 ──────────────────────
+(function(){
+  const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const label = isNativeApp ? '앱' : '사이트';
+  document.title = `1-3반 정보 제공 ${label}`;
+  const sub = document.getElementById('bw-hero-sub');
+  if (sub) sub.textContent = `1-3반 정보 제공 ${label}입니다.`;
+})();
+
 // ── 과제 미리보기 ──────────────────────────────────────────
 const HW_SHEET_ID = "1O67_ZsjapBTwNmskAIdEtiuGhlRbhXJhfy5mu4rLxSE";
 const HW_URL = `https://docs.google.com/spreadsheets/d/${HW_SHEET_ID}/gviz/tq?tqx=out:json&sheet=Sheet1`;
@@ -231,7 +241,7 @@ fetch(HW_URL)
   });
 
 // ── 게시판 미리보기 ────────────────────────────────────────
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2Vb0fqAgjQZ_YiR_G9l1onIqFo2HnFP_6cc9NAtKVPBtzxS6f5fqbaMV8PGE3QYHEhA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd9WxNguKd3YbPp8_fGLNLiuv3Sp9Pkedg1WmFcjrebha19A6GNl8agXeZP_5FGUJVuA/exec";
 
 fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
   .then(r => r.json())

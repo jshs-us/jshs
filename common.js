@@ -166,8 +166,12 @@ body{
   // ── AUTH (앱 전체 로그인) ─────────────────────────────────────
   // ※ board.html 에서 쓰던 것과 동일한 Apps Script 배포 주소를 그대로 사용합니다.
   //   실제 배포 주소가 다르면 아래 값을 교체해주세요.
-  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2Vb0fqAgjQZ_YiR_G9l1onIqFo2HnFP_6cc9NAtKVPBtzxS6f5fqbaMV8PGE3QYHEhA/exec";
-  const SESSION_KEY = "gwakuriSession"; // sessionStorage: 탭/창을 닫으면 자동 삭제됨
+  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd9WxNguKd3YbPp8_fGLNLiuv3Sp9Pkedg1WmFcjrebha19A6GNl8agXeZP_5FGUJVuA/exec";
+  const SESSION_KEY = "gwakuriSession";
+  // 앱(Capacitor 네이티브)에서는 완전히 껐다 켜도 로그인이 유지되도록 localStorage를 쓰고,
+  // 웹사이트(브라우저)에서는 기존처럼 탭/창을 닫으면 로그아웃되도록 sessionStorage를 씁니다.
+  const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const sessionStore = isNativeApp ? window.localStorage : window.sessionStorage;
 
   function authCall(action, params){
     return fetch(AUTH_SCRIPT_URL, {
@@ -177,15 +181,15 @@ body{
   }
   function getSession(){
     try{
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = sessionStore.getItem(SESSION_KEY);
       return raw ? JSON.parse(raw) : null;
     }catch(e){ return null; }
   }
   function setSession(sess){
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(sess));
+    sessionStore.setItem(SESSION_KEY, JSON.stringify(sess));
   }
   function logout(){
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStore.removeItem(SESSION_KEY);
     location.reload();
   }
 
@@ -221,7 +225,7 @@ body{
   // FOOTER
   const FOOT=`
 <footer class="bw-footer">
-  1-3반 정보 제공 앱 &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
+  1-3반 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
   &nbsp;&nbsp;|&nbsp;&nbsp;
   문의: <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a>
 </footer>`;
