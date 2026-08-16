@@ -166,7 +166,7 @@ body{
   // ── AUTH (앱 전체 로그인) ─────────────────────────────────────
   // ※ board.html 에서 쓰던 것과 동일한 Apps Script 배포 주소를 그대로 사용합니다.
   //   실제 배포 주소가 다르면 아래 값을 교체해주세요.
-  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3KMpWYl78ieQZypV1y8Vdx45Em5wC12PYWJqhICMesng1X3t7nWaI6ozGuLKy5WrH8A/exec";
+  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2Vb0fqAgjQZ_YiR_G9l1onIqFo2HnFP_6cc9NAtKVPBtzxS6f5fqbaMV8PGE3QYHEhA/exec";
   const SESSION_KEY = "gwakuriSession"; // sessionStorage: 탭/창을 닫으면 자동 삭제됨
 
   function authCall(action, params){
