@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <style>html{visibility:hidden}</style>
-<title>1-3반 정보 제공 사이트</title>
+<title>1-3반 정보 제공 앱</title>
 <style>
 /* ── HERO ── */
 .bw-hero{
@@ -116,7 +116,7 @@
 <section class="bw-hero">
   <img src="logo.png" alt="전남과학고 로고" style="width:100px;height:100px;object-fit:contain;border-radius:50%;background:rgba(255,255,255,0.12);padding:8px;margin-bottom:24px;box-shadow:0 4px 24px rgba(0,0,0,0.25);"/>
   <h1>반갑습니다,</h1>
-  <p class="bw-hero-sub">1-3반 정보 제공 사이트입니다.</p>
+  <p class="bw-hero-sub">1-3반 정보 제공 앱입니다.</p>
   <p class="bw-hero-credit">Made by Jvnxyk</p>
   <div class="bw-section-nav">
     <a href="homework.html"  class="bw-snav-btn">📚 과제</a>
@@ -231,7 +231,7 @@ fetch(HW_URL)
   });
 
 // ── 게시판 미리보기 ────────────────────────────────────────
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz3KMpWYl78ieQZypV1y8Vdx45Em5wC12PYWJqhICMesng1X3t7nWaI6ozGuLKy5WrH8A/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycby2Vb0fqAgjQZ_YiR_G9l1onIqFo2HnFP_6cc9NAtKVPBtzxS6f5fqbaMV8PGE3QYHEhA/exec";
 
 fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
   .then(r => r.json())
