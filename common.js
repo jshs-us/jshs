@@ -166,7 +166,7 @@ body{
   // ── AUTH (앱 전체 로그인) ─────────────────────────────────────
   // ※ board.html 에서 쓰던 것과 동일한 Apps Script 배포 주소를 그대로 사용합니다.
   //   실제 배포 주소가 다르면 아래 값을 교체해주세요.
-  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd9WxNguKd3YbPp8_fGLNLiuv3Sp9Pkedg1WmFcjrebha19A6GNl8agXeZP_5FGUJVuA/exec";
+  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylZ1iIFsplZP99u783pdzB08pA8WrbpnPaW_xSmH09MKLBqD6Maif-RFkuiYJQnwzCnA/exec";
   const SESSION_KEY = "gwakuriSession";
   // 앱(Capacitor 네이티브)에서는 완전히 껐다 켜도 로그인이 유지되도록 localStorage를 쓰고,
   // 웹사이트(브라우저)에서는 기존처럼 탭/창을 닫으면 로그아웃되도록 sessionStorage를 씁니다.

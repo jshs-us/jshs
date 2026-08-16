@@ -241,7 +241,7 @@ fetch(HW_URL)
   });
 
 // ── 게시판 미리보기 ────────────────────────────────────────
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwd9WxNguKd3YbPp8_fGLNLiuv3Sp9Pkedg1WmFcjrebha19A6GNl8agXeZP_5FGUJVuA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylZ1iIFsplZP99u783pdzB08pA8WrbpnPaW_xSmH09MKLBqD6Maif-RFkuiYJQnwzCnA/exec";
 
 fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
   .then(r => r.json())
