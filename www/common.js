@@ -164,9 +164,8 @@ body{
   document.head.insertBefore(s,document.head.firstChild);
 
   // ── AUTH (앱 전체 로그인) ─────────────────────────────────────
-  // ※ board.html 에서 쓰던 것과 동일한 Apps Script 배포 주소를 그대로 사용합니다.
-  //   실제 배포 주소가 다르면 아래 값을 교체해주세요.
-  const AUTH_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylZ1iIFsplZP99u783pdzB08pA8WrbpnPaW_xSmH09MKLBqD6Maif-RFkuiYJQnwzCnA/exec";
+  // Apps Script 배포 주소는 config.js 한 곳에서만 관리합니다.
+  const AUTH_SCRIPT_URL = (window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
   const SESSION_KEY = "gwakuriSession";
   // 앱(Capacitor 네이티브)에서는 완전히 껐다 켜도 로그인이 유지되도록 localStorage를 쓰고,
   // 웹사이트(브라우저)에서는 기존처럼 탭/창을 닫으면 로그아웃되도록 sessionStorage를 씁니다.
@@ -263,8 +262,8 @@ body{
     wrap.innerHTML = `
       <div class="bw-authbox">
         <img src="logo.png" class="bw-authlogo" alt="전남과학고 로고"/>
-        <h2>1-3반 ${isNativeApp ? '앱' : '사이트'}</h2>
-        <p class="bw-authsub">로그인해야 ${isNativeApp ? '앱' : '사이트'}을 이용할 수 있어요.</p>
+        <h2>1-3반 앱</h2>
+        <p class="bw-authsub">로그인해야 앱을 이용할 수 있어요.</p>
         <div class="bw-authtabs">
           <button type="button" class="bw-authtab active" data-m="login">로그인</button>
           <button type="button" class="bw-authtab" data-m="signup">회원가입</button>
@@ -324,4 +323,101 @@ body{
     passEl.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
     userEl.addEventListener('keydown', e=>{ if(e.key==='Enter') passEl.focus(); });
   }
+})();
+
+// ============================================================
+// 당겨서 새로고침 (Pull-to-refresh) — 모든 페이지 공통 적용
+// 화면 맨 위에서 아래로 당기면 새로고침됩니다.
+// (터치 기반이라 폰 앱/모바일 브라우저에서만 동작하고, 데스크톱
+// 브라우저는 터치 이벤트가 없어 자연히 아무 영향 없습니다.)
+// ============================================================
+(function () {
+  const THRESHOLD = 70; // 이만큼 당겨야 새로고침 실행 (px)
+  let startY = 0;
+  let pulling = false;
+  let indicator = null;
+
+  function scrollTop() {
+    return document.scrollingElement ? document.scrollingElement.scrollTop : window.scrollY;
+  }
+
+  function ensureIndicator() {
+    if (indicator) return indicator;
+    indicator = document.createElement('div');
+    indicator.textContent = '↓ 당겨서 새로고침';
+    indicator.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'height:0', 'overflow:hidden',
+      'font-size:13px', 'font-weight:700', 'color:#fff',
+      'background:var(--navy,#0b1f4d)',
+      'padding-top:env(safe-area-inset-top)',
+      'transition:height .12s',
+      'pointer-events:none'
+    ].join(';');
+    document.body.appendChild(indicator);
+    return indicator;
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    if (scrollTop() > 0 || e.touches.length !== 1) { pulling = false; return; }
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    if (scrollTop() > 0) { pulling = false; if (indicator) indicator.style.height = '0px'; return; }
+    const dy = e.touches[0].clientY - startY;
+    const ind = ensureIndicator();
+    if (dy <= 0) { ind.style.height = '0px'; return; }
+    const h = Math.min(dy * 0.5, 90);
+    ind.style.height = h + 'px';
+    ind.textContent = h >= THRESHOLD ? '↑ 놓으면 새로고침' : '↓ 당겨서 새로고침';
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (!indicator) return;
+    const h = parseInt(indicator.style.height || '0', 10);
+    if (h >= THRESHOLD) {
+      indicator.textContent = '새로고침 중...';
+      location.reload();
+    } else {
+      indicator.style.height = '0px';
+    }
+  }, { passive: true });
+})();
+
+// ============================================================
+// 좁은 화면(폰) 자동 최적화 — 같은 코드, 화면 크기에 따라 CSS로만 조정
+// 이 앱은 안드로이드 전용이라 항상 세로 모드의 좁은 화면에서 열립니다.
+// 별도의 "모바일 전용 페이지"를 따로 만들면 두 벌의 코드를 계속 같이
+// 관리해야 해서 더 위험합니다 — 대신 화면 폭에 따라 자동으로 버튼/입력
+// 요소 크기를 조정하는 전역 규칙 하나만 추가합니다.
+// ============================================================
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    @media (max-width: 400px) {
+      button, input[type="button"], input[type="submit"] {
+        min-height: 40px;
+        font-size: 14px;
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+      input[type="text"], input[type="password"], input[type="number"],
+      select, textarea {
+        font-size: 16px; /* 16px 미만이면 안드로이드에서 입력창 탭 시 화면이 확대되는 문제 방지 */
+      }
+    }
+    @media (max-width: 340px) {
+      button, input[type="button"], input[type="submit"] {
+        min-height: 36px;
+        font-size: 13px;
+      }
+    }
+  `;
+  document.head.appendChild(style);
 })();
