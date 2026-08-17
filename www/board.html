@@ -125,11 +125,12 @@
   </div>
 </div>
 
+<script src="config.js"></script>
 <script src="native-bridge.js"></script>
 <script src="common.js"></script>
 <script>
 (function(){
-const SCRIPT_URL="https://script.google.com/macros/s/AKfycbylZ1iIFsplZP99u783pdzB08pA8WrbpnPaW_xSmH09MKLBqD6Maif-RFkuiYJQnwzCnA/exec";
+const SCRIPT_URL=(window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
 // ── 사진/파일 업로드: Cloudinary ──────────────────
 const CLOUDINARY_CLOUD_NAME="cyu356na";
 const CLOUDINARY_UPLOAD_PRESET="gwakuri_board";

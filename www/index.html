@@ -150,6 +150,7 @@
 
 <div style="height:60px;"></div>
 
+<script src="config.js"></script>
 <script src="native-bridge.js"></script>
 <script src="common.js"></script>
 <script>
@@ -241,7 +242,7 @@ fetch(HW_URL)
   });
 
 // ── 게시판 미리보기 ────────────────────────────────────────
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbylZ1iIFsplZP99u783pdzB08pA8WrbpnPaW_xSmH09MKLBqD6Maif-RFkuiYJQnwzCnA/exec";
+const SCRIPT_URL = (window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
 
 fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
   .then(r => r.json())
