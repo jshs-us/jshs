@@ -252,7 +252,14 @@ async function loadCmts(pid){try{const r=await call("listComments",{postId:pid})
 async function openPost(id){app.innerHTML=`<div class="loading">불러오는 중...</div>`;const r=await call("getPost",{id});if(r.success){S.currentPost=r.post;S.view="detail";render();}else{S.view="list";render();}}
 async function loadPosts(){app.innerHTML=`<div class="loading">불러오는 중...</div>`;try{const r=await call("listPosts",{});S.posts=r.success?r.posts:[];}catch{S.posts=[];}render();}
 
-loadPosts();
+// 알림(새 글/댓글)을 탭해서 들어온 경우: #post=<id> 해시가 있으면
+// 목록을 먼저 불러온 뒤 해당 글을 바로 열기 (순서 보장을 위해 체이닝)
+if (location.hash.startsWith('#post=')) {
+  const _pid = location.hash.slice('#post='.length);
+  loadPosts().then(() => openPost(_pid));
+} else {
+  loadPosts();
+}
 })();
 </script>
 </body>
