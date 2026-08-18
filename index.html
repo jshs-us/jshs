@@ -3,8 +3,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<!-- PWA / iOS 홈 화면 추가 지원 -->
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="과학구리"/>
+<meta name="theme-color" content="#061442"/>
 <style>html{visibility:hidden}</style>
-<title>1-3반</title>
+<title>과학구리</title>
 <style>
 /* ── HERO ── */
 .bw-hero{
@@ -165,9 +172,9 @@
 (function(){
   const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const label = isNativeApp ? '앱' : '사이트';
-  document.title = `1-3반 정보 제공 ${label}`;
+  document.title = `과학구리 정보 제공 ${label}`;
   const sub = document.getElementById('bw-hero-sub');
-  if (sub) sub.textContent = `1-3반 정보 제공 ${label}입니다.`;
+  if (sub) sub.textContent = `과학구리 정보 제공 ${label}입니다.`;
 })();
 
 // ── 과제 미리보기 ──────────────────────────────────────────

@@ -205,7 +205,7 @@ body{
   const NAV = `
 <nav class="bw-nav">
   <div class="bw-nav-inner">
-    <a class="bw-logo" href="index.html"><img src="logo.png" alt="전남과학고 로고"/>1-3반</a>
+    <a class="bw-logo" href="index.html"><img src="logo.png" alt="전남과학고 로고"/>과학구리</a>
     <button class="bw-hamburger" id="bw-hbg" aria-label="메뉴"><span></span><span></span><span></span></button>
     <ul class="bw-nav-links" id="bw-nl">
       <li><a href="homework.html"  ${current==='homework.html'?'class="active"':''}>과제</a></li>
@@ -224,7 +224,7 @@ body{
   // FOOTER
   const FOOT=`
 <footer class="bw-footer">
-  1-3반 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
+  과학구리 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
   &nbsp;&nbsp;|&nbsp;&nbsp;
   문의: <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a>
 </footer>`;
@@ -262,7 +262,7 @@ body{
     wrap.innerHTML = `
       <div class="bw-authbox">
         <img src="logo.png" class="bw-authlogo" alt="전남과학고 로고"/>
-        <h2>1-3반 앱</h2>
+        <h2>과학구리 앱</h2>
         <p class="bw-authsub">로그인해야 앱을 이용할 수 있어요.</p>
         <div class="bw-authtabs">
           <button type="button" class="bw-authtab active" data-m="login">로그인</button>
