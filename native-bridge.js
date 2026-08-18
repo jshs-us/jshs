@@ -127,6 +127,7 @@
   // 플러그인으로 채널을 만듭니다.
   const MEAL_CHANNEL_ID = 'meal_reminder';
   const FINE_CHANNEL_ID = 'fine_notice';
+  const BOARD_CHANNEL_ID = 'board_notice';
 
   async function ensureMealChannel() {
     if (!PushNotifications || !PushNotifications.createChannel) return;
@@ -157,6 +158,19 @@
         visibility: 1
       });
     } catch (e) { console.warn('[fine-channel] failed', e); }
+  }
+
+  async function ensureBoardChannel() {
+    if (!PushNotifications || !PushNotifications.createChannel) return;
+    try {
+      await PushNotifications.createChannel({
+        id: BOARD_CHANNEL_ID,
+        name: '게시판 알림',
+        description: '새 글이 올라오거나 내 글에 댓글이 달리면 알려드려요',
+        importance: 3,   // NotificationManager.IMPORTANCE_DEFAULT
+        visibility: 1
+      });
+    } catch (e) { console.warn('[board-channel] failed', e); }
   }
 
   // 푸시 알림을 탭했을 때: data.route로 이동 (급식/벌금 알림 공통)
@@ -214,6 +228,7 @@
     try {
       await ensureFineChannel();
       await ensureMealChannel();
+      await ensureBoardChannel();
       let perm = await PushNotifications.checkPermissions();
       if (perm.receive !== 'granted') {
         perm = await PushNotifications.requestPermissions();

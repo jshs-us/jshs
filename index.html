@@ -146,6 +146,13 @@
     <div class="bw-preview-foot">게시판 바로가기 →</div>
   </a>
 
+  <!-- 오늘의 시간표 미리보기 -->
+  <a href="timetable.html" class="bw-preview-card">
+    <div class="bw-preview-head"><span class="emo">🗓️</span> 오늘의 시간표</div>
+    <div class="bw-preview-body" id="tt-preview"><div class="bw-preview-empty">불러오는 중...</div></div>
+    <div class="bw-preview-foot">전체 시간표 보기 →</div>
+  </a>
+
 </div>
 
 <div style="height:60px;"></div>
@@ -260,6 +267,60 @@ fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'
   })
   .catch(() => {
     document.getElementById('board-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
+  });
+
+// ── 오늘의 시간표 미리보기 ──────────────────────────────────
+const TT_SHEET_ID = "1lIaO9t4V62HTBGGSMj9Ormm-GgEhgyqnXIV2ryCV5Yo";
+const TT_URL = `https://docs.google.com/spreadsheets/d/${TT_SHEET_ID}/gviz/tq?tqx=out:json`;
+
+fetch(TT_URL)
+  .then(r => r.text())
+  .then(raw => {
+    const json = JSON.parse(raw.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const rows = json.table.rows;
+    const box = document.getElementById('tt-preview');
+    if (!rows.length) { box.innerHTML = '<div class="bw-preview-empty">시간표가 없어요.</div>'; return; }
+
+    // timetable.html과 같은 방식: 첫 행이 헤더(요일명)인지 판단
+    const firstRow = rows[0].c?.map(c => c?.v ?? '') || [];
+    let headerRow, dataRows;
+    if (typeof firstRow[1] === 'string' && isNaN(firstRow[1])) {
+      headerRow = firstRow;
+      dataRows = rows.slice(1);
+    } else {
+      headerRow = ['교시', '월', '화', '수', '목', '금'];
+      dataRows = rows;
+    }
+
+    const dowNames = ['일', '월', '화', '수', '목', '금', '토'];
+    const todayDow = new Date().getDay();
+    const todayName = dowNames[todayDow];
+    const todayColIdx = headerRow.indexOf(todayName);
+
+    if (todayColIdx < 1) {
+      box.innerHTML = '<div class="bw-preview-empty">오늘은 시간표가 없어요.</div>';
+      return;
+    }
+
+    function esc(s){ const d=document.createElement('div');d.textContent=String(s??'');return d.innerHTML; }
+
+    const periods = dataRows.map(r => {
+      const cells = r.c || [];
+      const period = cells[0]?.v ?? '';
+      const subject = cells[todayColIdx]?.v ?? '';
+      return { period, subject };
+    }).filter(p => String(p.subject).trim());
+
+    if (!periods.length) { box.innerHTML = '<div class="bw-preview-empty">오늘은 시간표가 없어요.</div>'; return; }
+
+    box.innerHTML = periods.slice(0, 5).map(p => `
+      <div class="bw-preview-row">
+        <span>${esc(p.subject)}</span>
+        <span class="sub">${esc(p.period)}교시</span>
+      </div>`).join('');
+  })
+  .catch(() => {
+    document.getElementById('tt-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
   });
 </script>
 </body>
