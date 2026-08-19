@@ -390,6 +390,65 @@ body{
   }, { passive: true });
 })();
 
+(function () {
+  const THRESHOLD = 70; // 이만큼 당겨야 새로고침 실행 (px)
+  let startY = 0;
+  let pulling = false;
+  let indicator = null;
+
+  function scrollTop() {
+    return document.scrollingElement ? document.scrollingElement.scrollTop : window.scrollY;
+  }
+
+  function ensureIndicator() {
+    if (indicator) return indicator;
+    indicator = document.createElement('div');
+    indicator.textContent = '↓ 당겨서 새로고침';
+    indicator.style.cssText = [
+      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
+      'display:flex', 'align-items:center', 'justify-content:center',
+      'height:0', 'overflow:hidden',
+      'font-size:13px', 'font-weight:700', 'color:#fff',
+      'background:var(--navy,#0b1f4d)',
+      'padding-top:env(safe-area-inset-top)',
+      'transition:height .12s',
+      'pointer-events:none'
+    ].join(';');
+    document.body.appendChild(indicator);
+    return indicator;
+  }
+
+  document.addEventListener('touchstart', (e) => {
+    if (scrollTop() > 0 || e.touches.length !== 1) { pulling = false; return; }
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    if (scrollTop() > 0) { pulling = false; if (indicator) indicator.style.height = '0px'; return; }
+    const dy = e.touches[0].clientY - startY;
+    const ind = ensureIndicator();
+    if (dy <= 0) { ind.style.height = '0px'; return; }
+    const h = Math.min(dy * 0.5, 90);
+    ind.style.height = h + 'px';
+    ind.textContent = h >= THRESHOLD ? '↑ 놓으면 새로고침' : '↓ 당겨서 새로고침';
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    if (!indicator) return;
+    const h = parseInt(indicator.style.height || '0', 10);
+    if (h >= THRESHOLD) {
+      indicator.textContent = '새로고침 중...';
+      location.reload();
+    } else {
+      indicator.style.height = '0px';
+    }
+  }, { passive: true });
+})();
+
 
 (function () {
   const style = document.createElement('style');
