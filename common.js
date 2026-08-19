@@ -262,8 +262,8 @@ body{
     wrap.innerHTML = `
       <div class="bw-authbox">
         <img src="logo.png" class="bw-authlogo" alt="전남과학고 로고"/>
-        <h2>과학구리 앱</h2>
-        <p class="bw-authsub">로그인해야 앱을 이용할 수 있어요.</p>
+        <h2>과학구리${isNativeApp ? ' 앱' : ''}</h2>
+        <p class="bw-authsub">로그인해야 ${isNativeApp ? '앱을' : '사이트를'} 이용할 수 있어요.</p>
         <div class="bw-authtabs">
           <button type="button" class="bw-authtab active" data-m="login">로그인</button>
           <button type="button" class="bw-authtab" data-m="signup">회원가입</button>
