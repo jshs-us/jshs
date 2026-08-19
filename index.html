@@ -160,6 +160,13 @@
     <div class="bw-preview-foot">전체 시간표 보기 →</div>
   </a>
 
+  <!-- 이번 달 학사일정 미리보기 -->
+  <a href="calendar.html" class="bw-preview-card">
+    <div class="bw-preview-head"><span class="emo">📌</span> 이번 달 학사일정</div>
+    <div class="bw-preview-body" id="cal-preview"><div class="bw-preview-empty">불러오는 중...</div></div>
+    <div class="bw-preview-foot">전체 학사일정 보기 →</div>
+  </a>
+
 </div>
 
 <div style="height:60px;"></div>
@@ -288,6 +295,7 @@ fetch(TT_URL)
     const box = document.getElementById('tt-preview');
     if (!rows.length) { box.innerHTML = '<div class="bw-preview-empty">시간표가 없어요.</div>'; return; }
 
+    // timetable.html과 같은 방식: 첫 행이 헤더(요일명)인지 판단
     const firstRow = rows[0].c?.map(c => c?.v ?? '') || [];
     let headerRow, dataRows;
     if (typeof firstRow[1] === 'string' && isNaN(firstRow[1])) {
@@ -327,6 +335,53 @@ fetch(TT_URL)
   })
   .catch(() => {
     document.getElementById('tt-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
+  });
+
+// ── 이번 달 학사일정 미리보기 ────────────────────────────────
+const CAL_SHEET_ID = "1WpQv3cKHgUuBdTWff_OOuhTtgkX2EhLH4eET9ZLOs8Q";
+const CAL_GID = "879697319";
+const CAL_URL = `https://docs.google.com/spreadsheets/d/${CAL_SHEET_ID}/gviz/tq?tqx=out:json&gid=${CAL_GID}`;
+// calendar.html과 동일한 배치: A,B,C=5월 / D,E,F=6월 ... 3열씩, 1행=1일부터
+const CAL_MONTHS = [5, 6, 7, 8, 9, 10, 11, 12, 1, 2];
+
+fetch(CAL_URL)
+  .then(r => r.text())
+  .then(raw => {
+    const json = JSON.parse(raw.replace(/^[^(]+\(/, '').replace(/\);?\s*$/, ''));
+    const rows = json.table.rows;
+    const box = document.getElementById('cal-preview');
+
+    const now = new Date();
+    const curMonthNum = now.getMonth() + 1; // 1~12
+    const monthIdx = CAL_MONTHS.indexOf(curMonthNum);
+    if (monthIdx < 0) { box.innerHTML = '<div class="bw-preview-empty">이번 달은 학사일정 대상 기간이 아니에요.</div>'; return; }
+
+    const startCol = monthIdx * 3; // date, weekday, event
+    const todayDate = now.getDate();
+    const items = [];
+    for (let d = 1; d <= 31; d++) {
+      const r = rows[d - 1];
+      if (!r) break;
+      const cells = r.c || [];
+      const dv = cells[startCol]?.v ?? '';
+      if (parseInt(dv, 10) !== d) break;
+      const event = (cells[startCol + 2]?.v ?? '').toString().trim();
+      if (event) items.push({ date: d, event });
+    }
+
+    const upcoming = items.filter(it => it.date >= todayDate);
+    const list = (upcoming.length ? upcoming : items).slice(0, 5);
+
+    if (!list.length) { box.innerHTML = `<div class="bw-preview-empty">${curMonthNum}월에 등록된 일정이 없어요.</div>`; return; }
+
+    box.innerHTML = list.map(it => `
+      <div class="bw-preview-row">
+        <span>${it.event}</span>
+        <span class="sub">${curMonthNum}/${it.date}</span>
+      </div>`).join('');
+  })
+  .catch(() => {
+    document.getElementById('cal-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
   });
 </script>
 </body>
