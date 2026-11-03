@@ -224,7 +224,7 @@ body{
   // FOOTER
   const FOOT=`
 <footer class="bw-footer">
-  과학구리 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)">Jvnxyk</strong>
+  과학구리 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)" id="bw-egg-hub-trigger">Jvnxyk</strong>
   &nbsp;&nbsp;|&nbsp;&nbsp;
   문의: <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a>
 </footer>`;
@@ -390,66 +390,13 @@ body{
   }, { passive: true });
 })();
 
-(function () {
-  const THRESHOLD = 70; // 이만큼 당겨야 새로고침 실행 (px)
-  let startY = 0;
-  let pulling = false;
-  let indicator = null;
-
-  function scrollTop() {
-    return document.scrollingElement ? document.scrollingElement.scrollTop : window.scrollY;
-  }
-
-  function ensureIndicator() {
-    if (indicator) return indicator;
-    indicator = document.createElement('div');
-    indicator.textContent = '↓ 당겨서 새로고침';
-    indicator.style.cssText = [
-      'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
-      'display:flex', 'align-items:center', 'justify-content:center',
-      'height:0', 'overflow:hidden',
-      'font-size:13px', 'font-weight:700', 'color:#fff',
-      'background:var(--navy,#0b1f4d)',
-      'padding-top:env(safe-area-inset-top)',
-      'transition:height .12s',
-      'pointer-events:none'
-    ].join(';');
-    document.body.appendChild(indicator);
-    return indicator;
-  }
-
-  document.addEventListener('touchstart', (e) => {
-    if (scrollTop() > 0 || e.touches.length !== 1) { pulling = false; return; }
-    startY = e.touches[0].clientY;
-    pulling = true;
-  }, { passive: true });
-
-  document.addEventListener('touchmove', (e) => {
-    if (!pulling) return;
-    if (scrollTop() > 0) { pulling = false; if (indicator) indicator.style.height = '0px'; return; }
-    const dy = e.touches[0].clientY - startY;
-    const ind = ensureIndicator();
-    if (dy <= 0) { ind.style.height = '0px'; return; }
-    const h = Math.min(dy * 0.5, 90);
-    ind.style.height = h + 'px';
-    ind.textContent = h >= THRESHOLD ? '↑ 놓으면 새로고침' : '↓ 당겨서 새로고침';
-  }, { passive: true });
-
-  document.addEventListener('touchend', () => {
-    if (!pulling) return;
-    pulling = false;
-    if (!indicator) return;
-    const h = parseInt(indicator.style.height || '0', 10);
-    if (h >= THRESHOLD) {
-      indicator.textContent = '새로고침 중...';
-      location.reload();
-    } else {
-      indicator.style.height = '0px';
-    }
-  }, { passive: true });
-})();
-
-
+// ============================================================
+// 좁은 화면(폰) 자동 최적화 — 같은 코드, 화면 크기에 따라 CSS로만 조정
+// 이 앱은 안드로이드 전용이라 항상 세로 모드의 좁은 화면에서 열립니다.
+// 별도의 "모바일 전용 페이지"를 따로 만들면 두 벌의 코드를 계속 같이
+// 관리해야 해서 더 위험합니다 — 대신 화면 폭에 따라 자동으로 버튼/입력
+// 요소 크기를 조정하는 전역 규칙 하나만 추가합니다.
+// ============================================================
 (function () {
   const style = document.createElement('style');
   style.textContent = `
@@ -473,4 +420,217 @@ body{
     }
   `;
   document.head.appendChild(style);
+})();
+
+// ============================================================
+// 🥚 이스터에그 시스템
+// 각 페이지마다 그 페이지 테마에 맞는 숨은 미니게임이 따로 있고,
+// 푸터의 "Jvnxyk"를 3초 안에 3번 탭하면 전체 진행 상황을 모아보는
+// "나의 이스터에그" 화면이 열립니다 (한 번 찾으면 계속 버튼이 보여요).
+// ============================================================
+(function () {
+  const HUB_UNLOCK_KEY = 'bw_egg_hub_unlocked';
+
+  const session = (window.GwakuriAuth && window.GwakuriAuth.getSession) ? window.GwakuriAuth.getSession() : null;
+  const myUsername = session ? session.username : null;
+
+  function _esc(s) { const d = document.createElement('div'); d.textContent = String(s ?? ''); return d.innerHTML; }
+
+  function playFoundChime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const notes = [880, 1108.73, 1318.51]; // 또로롱 하고 올라가는 3음 차임
+      notes.forEach((freq, i) => {
+        const t0 = ctx.currentTime + i * 0.1;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0, t0);
+        gain.gain.linearRampToValueAtTime(0.28, t0 + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.55);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(t0);
+        osc.stop(t0 + 0.6);
+      });
+      setTimeout(() => ctx.close(), 900);
+    } catch (e) {}
+  }
+
+  function ensureRevealStyle() {
+    if (document.getElementById('bw-egg-reveal-style')) return;
+    const s = document.createElement('style');
+    s.id = 'bw-egg-reveal-style';
+    s.textContent = `
+      #bw-egg-reveal{position:fixed;inset:0;z-index:999998;display:flex;
+        flex-direction:column;align-items:center;justify-content:center;gap:6px;
+        background:rgba(6,20,66,.55);pointer-events:none;
+        animation:bwRevealFade .9s ease forwards;}
+      .bw-egg-reveal-emoji{font-size:44px;
+        animation:bwRevealPop .55s cubic-bezier(.34,1.56,.64,1);}
+      .bw-egg-reveal-text{color:#ffec00;font-weight:900;font-size:16px;
+        letter-spacing:.2px;text-shadow:0 2px 10px rgba(0,0,0,.5);
+        opacity:0;animation:bwRevealTextIn .5s ease .15s forwards;}
+      @keyframes bwRevealFade{0%{opacity:0}18%{opacity:1}75%{opacity:1}100%{opacity:0}}
+      @keyframes bwRevealPop{0%{transform:scale(.3) rotate(-15deg);opacity:0}
+        60%{transform:scale(1.18) rotate(6deg);opacity:1}
+        100%{transform:scale(1) rotate(0);opacity:1}}
+      @keyframes bwRevealTextIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    `;
+    document.head.appendChild(s);
+  }
+
+  /** 이스터에그를 찾았을 때 공통으로 쓰는 연출 (효과음 + 반짝임 텍스트) 후 콜백 실행 */
+  function revealThen(label, cb) {
+    ensureRevealStyle();
+    playFoundChime();
+    const flash = document.createElement('div');
+    flash.id = 'bw-egg-reveal';
+    flash.innerHTML = `<div class="bw-egg-reveal-emoji">✨🥚✨</div><div class="bw-egg-reveal-text">${_esc(label)}</div>`;
+    document.body.appendChild(flash);
+    setTimeout(() => { flash.remove(); cb && cb(); }, 850);
+  }
+  window.BwEgg = window.BwEgg || {};
+  window.BwEgg.revealThen = revealThen;
+  window.BwEgg.esc = _esc;
+
+  /** 개별 미니게임에서 점수를 서버에 제출할 때 공통으로 쓰는 함수 */
+  window.BwEgg.submitScore = function (eggId, score) {
+    if (!myUsername || !window.GwakuriAuth) return Promise.resolve(null);
+    return window.GwakuriAuth.call('eggSubmitScore', { username: myUsername, eggId, score }).catch(() => null);
+  };
+
+  // ── 허브 잠금 해제 트리거: 푸터의 "Jvnxyk"를 3초 안에 3번 탭 ──────
+  const NEEDED = 3, TAP_WINDOW = 3000;
+  let tapCount = 0, resetTimer = null;
+
+  function unlockHub() {
+    if (localStorage.getItem(HUB_UNLOCK_KEY) === '1') { showHub(); return; }
+    localStorage.setItem(HUB_UNLOCK_KEY, '1');
+    injectHubNavButton();
+    revealThen('이스터에그 허브 발견!', showHub);
+  }
+
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('#bw-egg-hub-trigger');
+    if (!trigger) return;
+    tapCount++;
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { tapCount = 0; }, TAP_WINDOW);
+    if (tapCount >= NEEDED) { tapCount = 0; unlockHub(); }
+  });
+
+  function injectHubNavButton() {
+    if (document.getElementById('bw-egg-hub-navbtn')) return;
+    const userwrap = document.querySelector('.bw-nav-userwrap');
+    if (!userwrap) return;
+    const btn = document.createElement('a');
+    btn.id = 'bw-egg-hub-navbtn';
+    btn.href = 'javascript:void(0)';
+    btn.textContent = '🥚 이스터에그';
+    btn.style.cssText = 'margin-left:6px;';
+    btn.addEventListener('click', showHub);
+    userwrap.insertBefore(btn, userwrap.firstChild);
+  }
+
+  // 이미 이전에 찾아둔 상태라면 페이지 로드 시 바로 버튼 노출
+  if (localStorage.getItem(HUB_UNLOCK_KEY) === '1') {
+    // nav가 비동기로 그려질 수 있어 살짝 지연 후 삽입 시도
+    setTimeout(injectHubNavButton, 0);
+    setTimeout(injectHubNavButton, 300);
+  }
+
+  function ensureHubStyle() {
+    if (document.getElementById('bw-egg-hub-style')) return;
+    const s = document.createElement('style');
+    s.id = 'bw-egg-hub-style';
+    s.textContent = `
+      #bw-egg-hub{position:fixed;inset:0;z-index:999999;background:#040d29;
+        display:flex;flex-direction:column;animation:bwEggFade .2s ease;
+        padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;overflow-y:auto;}
+      @keyframes bwEggFade{from{opacity:0}to{opacity:1}}
+      .bw-egg-hub-top{display:flex;align-items:center;justify-content:space-between;
+        padding:14px 18px;color:#fff;font-weight:800;font-size:15px;}
+      .bw-egg-hub-close{background:rgba(255,255,255,.1);border:none;color:#fff;
+        width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;}
+      .bw-egg-hub-body{padding:6px 18px 28px;max-width:420px;margin:0 auto;width:100%;}
+      .bw-egg-hub-section-title{color:rgba(255,255,255,.55);font-size:12.5px;font-weight:800;
+        margin:18px 0 8px;letter-spacing:.3px;}
+      .bw-egg-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+      .bw-egg-list li{display:flex;align-items:center;justify-content:space-between;
+        background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+        border-radius:12px;padding:12px 14px;}
+      .bw-egg-list li.found{background:rgba(255,236,0,.08);border-color:rgba(255,236,0,.25);}
+      .bw-egg-list .n{color:#fff;font-weight:700;font-size:13.5px;}
+      .bw-egg-list li:not(.found) .n{color:rgba(255,255,255,.35);}
+      .bw-egg-list .s{font-weight:800;font-size:13.5px;color:#ffec00;}
+      .bw-egg-list li:not(.found) .s{color:rgba(255,255,255,.25);}
+      .bw-egg-board2{margin-top:6px;display:flex;flex-direction:column;gap:6px;}
+      .bw-egg-board2 li{display:flex;align-items:center;gap:10px;
+        background:rgba(255,255,255,.04);border-radius:10px;padding:9px 12px;
+        list-style:none;}
+      .bw-egg-board2 .crown{font-size:16px;width:22px;text-align:center;}
+      .bw-egg-board2 .name{flex:1;color:rgba(255,255,255,.85);font-size:13.5px;
+        overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .bw-egg-board2 .pts{color:#ffec00;font-weight:800;font-size:13px;}
+      .bw-egg-empty{color:rgba(255,255,255,.4);font-size:13px;padding:8px 2px;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  function showHub() {
+    if (document.getElementById('bw-egg-hub')) return;
+    ensureHubStyle();
+    const box = document.createElement('div');
+    box.id = 'bw-egg-hub';
+    box.innerHTML = `
+      <div class="bw-egg-hub-top">
+        <span>🥚 나의 이스터에그</span>
+        <button class="bw-egg-hub-close" type="button" aria-label="닫기">✕</button>
+      </div>
+      <div class="bw-egg-hub-body">
+        <div class="bw-egg-hub-section-title">내가 찾은 이스터에그</div>
+        <ul class="bw-egg-list" id="bw-egg-hub-mine"><li class="bw-egg-empty">불러오는 중...</li></ul>
+        <div class="bw-egg-hub-section-title">🏆 합산 점수 TOP 5</div>
+        <ul class="bw-egg-board2" id="bw-egg-hub-board"><li class="bw-egg-empty">불러오는 중...</li></ul>
+      </div>
+    `;
+    document.body.appendChild(box);
+    box.querySelector('.bw-egg-hub-close').addEventListener('click', () => box.remove());
+
+    if (!myUsername || !window.GwakuriAuth) {
+      box.querySelector('#bw-egg-hub-mine').innerHTML = '<li class="bw-egg-empty">로그인 후 이용할 수 있어요.</li>';
+    } else {
+      window.GwakuriAuth.call('eggMyProgress', { username: myUsername }).then(r => {
+        const eggs = (r && r.success) ? r.eggs : [];
+        const ul = box.querySelector('#bw-egg-hub-mine');
+        if (!eggs.length) { ul.innerHTML = '<li class="bw-egg-empty">아직 이스터에그 정보가 없어요.</li>'; return; }
+        ul.innerHTML = eggs.map(egg => `
+          <li class="${egg.found ? 'found' : ''}">
+            <span class="n">${egg.found ? _esc(egg.name) : '--'}</span>
+            <span class="s">${egg.found ? egg.score + '점' : '--'}</span>
+          </li>`).join('');
+      }).catch(() => {
+        box.querySelector('#bw-egg-hub-mine').innerHTML = '<li class="bw-egg-empty">불러오지 못했어요.</li>';
+      });
+    }
+
+    const call = window.GwakuriAuth ? window.GwakuriAuth.call('eggLeaderboard', { limit: 5 }) : Promise.resolve(null);
+    call.then(r => {
+      const list = (r && r.success) ? r.list : [];
+      const ul = box.querySelector('#bw-egg-hub-board');
+      if (!list.length) { ul.innerHTML = '<li class="bw-egg-empty">아직 기록이 없어요.</li>'; return; }
+      const crowns = ['🥇', '🥈', '🥉'];
+      ul.innerHTML = list.map((row, i) => `
+        <li>
+          <span class="crown">${crowns[i] || (i + 1)}</span>
+          <span class="name">${_esc(row.username)}</span>
+          <span class="pts">${row.best}점</span>
+        </li>`).join('');
+    }).catch(() => {
+      box.querySelector('#bw-egg-hub-board').innerHTML = '<li class="bw-egg-empty">불러오지 못했어요.</li>';
+    });
+  }
 })();
