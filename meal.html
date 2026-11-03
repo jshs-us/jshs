@@ -78,7 +78,7 @@
 </head>
 <body>
 <div class="bw-page">
-  <h1 class="bw-page-title">🍱 급식</h1>
+  <h1 class="bw-page-title"><span id="bw-egg-meal-trigger" style="cursor:default;">🍱</span> 급식</h1>
   <p class="bw-page-sub" id="meal-sub">스프레드시트에서 실시간으로 불러옵니다.</p>
 
   <div class="meal-nav">
@@ -238,6 +238,297 @@ fetch(URL)
     document.getElementById("meal-body").innerHTML =
       `<div class="meal-empty">스프레드시트를 불러오지 못했어요.<br>공유 설정을 확인해주세요.</div>`;
   });
+
+// ============================================================
+// 🥚 이스터에그: 급식실 탈출 작전 — 🍱 아이콘을 3초 안에 3번 탭하면 시작
+// 드래그로 복도를 달려 장애물을 피하고, 인기 반찬을 모아 급식실까지!
+// ============================================================
+(function () {
+  const NEEDED = 3, TAP_WINDOW = 3000;
+  let tapCount = 0, resetTimer = null;
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('#bw-egg-meal-trigger');
+    if (!t) return;
+    tapCount++;
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { tapCount = 0; }, TAP_WINDOW);
+    if (tapCount >= NEEDED) {
+      tapCount = 0;
+      if (window.BwEgg) window.BwEgg.revealThen('급식실 탈출 작전 발견!', startGame);
+    }
+  });
+
+  const LIVES_START = 3;
+  const CHAR = '🏃';
+  const OBSTACLES = ['🧹', '📦', '🧑\u200d🏫']; // 청소도구함, 상자, 선생님
+  const BONUS = '🍖'; // 인기 반찬 보너스
+
+  function ensureStyle() {
+    if (document.getElementById('bw-egg-meal-style')) return;
+    const s = document.createElement('style');
+    s.id = 'bw-egg-meal-style';
+    s.textContent = `
+      #bw-egg-meal{position:fixed;inset:0;z-index:999999;background:#040d29;
+        display:flex;flex-direction:column;animation:bwMealFade .2s ease;
+        padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;}
+      @keyframes bwMealFade{from{opacity:0}to{opacity:1}}
+      .bw-egg-meal-top{display:flex;align-items:center;justify-content:space-between;
+        padding:14px 18px;color:#fff;flex-shrink:0;position:relative;z-index:3;
+        background:linear-gradient(to bottom, rgba(4,13,41,.85), rgba(4,13,41,0));}
+      .bw-egg-meal-top .title{font-weight:800;font-size:15px;}
+      .bw-egg-meal-hearts{font-size:15px;letter-spacing:2px;}
+      .bw-egg-meal-score-pill{background:rgba(255,236,0,.14);border:1px solid rgba(255,236,0,.35);
+        color:#ffec00;font-weight:800;font-size:13px;padding:5px 12px;border-radius:999px;}
+      .bw-egg-meal-close{background:rgba(255,255,255,.1);border:none;color:#fff;
+        width:30px;height:30px;border-radius:50%;font-size:15px;cursor:pointer;}
+      .bw-egg-meal-field{position:relative;flex:1;overflow:hidden;touch-action:none;}
+      .bw-egg-meal-field canvas{position:absolute;inset:0;width:100%;height:100%;}
+      .bw-egg-meal-panel{position:absolute;inset:0;display:flex;flex-direction:column;
+        align-items:center;justify-content:center;gap:14px;text-align:center;
+        padding:24px;background:rgba(4,13,41,.72);z-index:2;pointer-events:none;}
+      .bw-egg-meal-panel.result{pointer-events:auto;}
+      .bw-egg-meal-card{background:linear-gradient(180deg,#0d2358,#0a1c47);
+        border:1px solid rgba(255,255,255,.08);border-radius:20px;
+        padding:26px 22px;width:100%;max-width:300px;box-shadow:0 12px 40px rgba(0,0,0,.45);}
+      .bw-egg-meal-card .emoji{font-size:46px;}
+      .bw-egg-meal-card h3{margin:10px 0 4px;color:#fff;font-size:19px;font-weight:800;}
+      .bw-egg-meal-card p{margin:0;font-size:12.5px;color:rgba(255,255,255,.6);line-height:1.5;}
+      .bw-egg-meal-card .score{font-size:42px;font-weight:900;color:#ffec00;margin:10px 0 2px;}
+      .bw-egg-meal-btnrow{display:flex;gap:8px;margin-top:14px;}
+      .bw-egg-meal-btn{border:none;border-radius:12px;padding:11px 16px;font-weight:800;
+        font-size:13.5px;cursor:pointer;flex:1;}
+      .bw-egg-meal-btn.primary{background:linear-gradient(180deg,#ffec00,#ffd400);color:#061442;}
+      .bw-egg-meal-btn.ghost{background:rgba(255,255,255,.08);color:#fff;}
+      .bw-egg-meal-flash{position:absolute;inset:0;background:#ff2d2d;opacity:0;pointer-events:none;
+        z-index:5;animation:bwMealFlash .28s ease forwards;}
+      @keyframes bwMealFlash{0%{opacity:.5}100%{opacity:0}}
+    `;
+    document.head.appendChild(s);
+  }
+
+  function startGame() {
+    if (document.getElementById('bw-egg-meal')) return;
+    ensureStyle();
+
+    const box = document.createElement('div');
+    box.id = 'bw-egg-meal';
+    box.innerHTML = `
+      <div class="bw-egg-meal-top">
+        <span class="title">🍱 급식실 탈출 작전</span>
+        <span class="bw-egg-meal-score-pill" id="bw-egg-meal-score">0점</span>
+        <span class="bw-egg-meal-hearts" id="bw-egg-meal-hearts">❤️❤️❤️</span>
+        <button class="bw-egg-meal-close" type="button" aria-label="닫기">✕</button>
+      </div>
+      <div class="bw-egg-meal-field" id="bw-egg-meal-field">
+        <canvas id="bw-egg-meal-canvas"></canvas>
+        <div class="bw-egg-meal-panel" id="bw-egg-meal-ready">
+          <div class="bw-egg-meal-card">
+            <div class="emoji">🏃</div>
+            <h3>손가락으로 좌우로 드래그!</h3>
+            <p>4교시 종이 울렸어요. 복도 장애물을 피해서<br/>최대한 오래 버텨보세요. 반찬(🍖)은 보너스!</p>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(box);
+
+    const field = box.querySelector('#bw-egg-meal-field');
+    const canvas = box.querySelector('#bw-egg-meal-canvas');
+    const scoreEl = box.querySelector('#bw-egg-meal-score');
+    const heartsEl = box.querySelector('#bw-egg-meal-hearts');
+    const readyEl = box.querySelector('#bw-egg-meal-ready');
+    const ctx = canvas.getContext('2d');
+
+    let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2);
+    function resize() {
+      W = field.clientWidth || 320;
+      H = field.clientHeight || 480;
+      canvas.width = W * DPR;
+      canvas.height = H * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    resize();
+
+    function haptic(kind) {
+      try {
+        const Hp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics;
+        if (!Hp) return;
+        if (kind === 'good') Hp.impact && Hp.impact({ style: 'LIGHT' });
+        else if (kind === 'bad') Hp.notification && Hp.notification({ type: 'ERROR' });
+      } catch (e) {}
+    }
+
+    let player = { x: W / 2, targetX: W / 2 };
+    let items = []; // { x, y, v, type: 'obs'|'bonus', emoji }
+    let score = 0, lives = LIVES_START, elapsed = 0, spawnClock = 0;
+    let state = 'ready'; // ready | playing | dead
+    let running = true, rafId = null, lastTs = 0;
+    let invincibleUntil = 0;
+
+    function currentSpeed() { return 140 + Math.min(elapsed * 6, 160); }
+    function currentInterval() { return Math.max(0.45, 0.85 - elapsed * 0.012); }
+
+    function spawnItem() {
+      const isBonus = Math.random() < 0.18;
+      const emoji = isBonus ? BONUS : OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)];
+      items.push({
+        x: 24 + Math.random() * (W - 48),
+        y: -20,
+        v: currentSpeed() * (0.9 + Math.random() * 0.3),
+        type: isBonus ? 'bonus' : 'obs',
+        emoji
+      });
+    }
+
+    function onPointerMove(clientX) {
+      const rect = canvas.getBoundingClientRect();
+      player.targetX = Math.max(20, Math.min(W - 20, clientX - rect.left));
+    }
+    function onPointerDown(e) {
+      e.preventDefault();
+      if (state === 'ready') { state = 'playing'; readyEl.style.display = 'none'; }
+      onPointerMove(e.clientX ?? (e.touches && e.touches[0].clientX));
+    }
+    function onPointerMoveEvt(e) {
+      if (state !== 'playing') return;
+      onPointerMove(e.clientX ?? (e.touches && e.touches[0].clientX));
+    }
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMoveEvt);
+
+    function flashScreen() {
+      const f = document.createElement('div');
+      f.className = 'bw-egg-meal-flash';
+      field.appendChild(f);
+      f.addEventListener('animationend', () => f.remove());
+    }
+
+    function loseLife() {
+      const now = performance.now();
+      if (now < invincibleUntil) return;
+      lives--;
+      invincibleUntil = now + 900;
+      haptic('bad');
+      flashScreen();
+      heartsEl.textContent = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(LIVES_START - Math.max(0, lives));
+      if (lives <= 0) die();
+    }
+
+    function die() {
+      if (state === 'dead') return;
+      state = 'dead';
+      running = false;
+      cancelAnimationFrame(rafId);
+
+      const panel = document.createElement('div');
+      panel.className = 'bw-egg-meal-panel result';
+      panel.innerHTML = `
+        <div class="bw-egg-meal-card">
+          <h3>🍽️ 급식 종료!</h3>
+          <div class="score">${score}점</div>
+          <p>더 오래 버틸수록, 반찬을 많이 모을수록 점수가 올라가요.</p>
+          <div class="bw-egg-meal-btnrow">
+            <button class="bw-egg-meal-btn primary" id="bw-egg-meal-retry">다시 하기</button>
+            <button class="bw-egg-meal-btn ghost" id="bw-egg-meal-done">닫기</button>
+          </div>
+        </div>
+      `;
+      field.appendChild(panel);
+      panel.querySelector('#bw-egg-meal-retry').addEventListener('click', () => { box.remove(); startGame(); });
+      panel.querySelector('#bw-egg-meal-done').addEventListener('click', () => box.remove());
+      if (window.BwEgg) window.BwEgg.submitScore('meal', score);
+    }
+
+    function update(dt) {
+      if (state !== 'playing') return;
+      elapsed += dt;
+      score += dt * 1; // 생존 시간에 비례한 기본 점수(초당 1점)
+
+      player.x += (player.targetX - player.x) * Math.min(1, dt * 12);
+
+      spawnClock += dt;
+      if (spawnClock >= currentInterval()) { spawnClock = 0; spawnItem(); }
+
+      const pr = 16;
+      for (let i = items.length - 1; i >= 0; i--) {
+        const it = items[i];
+        it.y += it.v * dt;
+        const dx = it.x - player.x, dy = it.y - (H - 64);
+        const hit = Math.sqrt(dx * dx + dy * dy) < pr + 14;
+        if (hit) {
+          if (it.type === 'bonus') { score += 15; haptic('good'); }
+          else loseLife();
+          items.splice(i, 1);
+          continue;
+        }
+        if (it.y > H + 30) items.splice(i, 1);
+      }
+      scoreEl.textContent = Math.floor(score) + '점';
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, '#0d2358');
+      g.addColorStop(1, '#040d29');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, H);
+
+      // 복도 차선 느낌의 세로줄
+      ctx.strokeStyle = 'rgba(255,255,255,.08)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([14, 16]);
+      const laneOffset = (elapsed * 120) % 30;
+      for (let x = W * 0.25; x < W; x += W * 0.5) {
+        ctx.beginPath();
+        ctx.moveTo(x, -laneOffset);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+
+      items.forEach(it => {
+        ctx.font = '30px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(it.emoji, it.x, it.y);
+      });
+
+      const blinking = performance.now() < invincibleUntil && Math.floor(performance.now() / 100) % 2 === 0;
+      ctx.save();
+      ctx.globalAlpha = blinking ? 0.35 : 1;
+      ctx.beginPath();
+      ctx.ellipse(player.x, H - 44, 14, 5, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,.25)';
+      ctx.fill();
+      ctx.font = '32px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(CHAR, player.x, H - 64);
+      ctx.restore();
+    }
+
+    function loop(ts) {
+      if (!running) return;
+      if (!lastTs) lastTs = ts;
+      const dt = Math.min((ts - lastTs) / 1000, 0.033);
+      lastTs = ts;
+      update(dt);
+      draw();
+      rafId = requestAnimationFrame(loop);
+    }
+    rafId = requestAnimationFrame(loop);
+
+    box.querySelector('.bw-egg-meal-close').addEventListener('click', () => {
+      running = false;
+      cancelAnimationFrame(rafId);
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointermove', onPointerMoveEvt);
+      box.remove();
+    });
+  }
+})();
 </script>
 </body>
 </html>

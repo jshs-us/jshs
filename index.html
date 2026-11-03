@@ -10,10 +10,6 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="과학구리"/>
 <meta name="theme-color" content="#061442"/>
-<meta name="google-site-verification" content="pbnV614-ITsjpr_yfkVmpp-cvYdjYiFYIBnBq_ZcA_4" />
-<meta name="keywords" content="과학구리, jshs-us, bestwing, best wing">
-<meta name="author" content="roysjh7, Edel">
-
 <style>html{visibility:hidden}</style>
 <title>과학구리</title>
 <style>
@@ -115,6 +111,18 @@
   text-align:right;
 }
 
+
+/* ── 앱 다운로드 버튼 (웹 전용) ── */
+.bw-dl-wrap{margin-top:22px;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.bw-dl-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  text-decoration:none;color:#fff;font-family:var(--ff);font-size:15px;font-weight:700;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);
+  border-radius:999px;padding:11px 26px;transition:.15s;
+}
+.bw-dl-btn:hover{background:var(--yellow);border-color:var(--yellow);color:var(--navy2);}
+.bw-dl-hint{font-size:12px;color:rgba(255,255,255,.45);}
+
 @media(max-width:680px){
   .bw-home-sections{grid-template-columns:1fr;padding:20px 14px 0;}
   .bw-section-nav{gap:8px;}
@@ -137,6 +145,10 @@
     <a href="board.html"     class="bw-snav-btn">💬 게시판</a>
     <a href="fine.html"      class="bw-snav-btn">💰 벌금</a>
     <a href="admin.html"     class="bw-snav-btn">👤 관리자</a>
+  </div>
+  <div class="bw-dl-wrap" id="bw-dl-wrap">
+    <a class="bw-dl-btn" href="https://drive.google.com/drive/folders/1YhU8LICXZA2sjI2C_dniD297dgKX7vcf?usp=drive_link" target="_blank" rel="noopener">📲 앱 다운로드 받기</a>
+    <span class="bw-dl-hint">Android 앱 · 구글 드라이브에서 받아요</span>
   </div>
 </section>
 
@@ -387,6 +399,9 @@ fetch(CAL_URL)
   .catch(() => {
     document.getElementById('cal-preview').innerHTML = '<div class="bw-preview-empty">불러오지 못했어요.</div>';
   });
+</script>
+<script>
+(function(){var C=window.Capacitor;if(C&&C.isNativePlatform&&C.isNativePlatform()){var w=document.getElementById('bw-dl-wrap');if(w)w.style.display='none';}})();
 </script>
 </body>
 </html>

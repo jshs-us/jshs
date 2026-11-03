@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<!-- PWA / iOS 홈 화면 추가 지원 -->
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -10,7 +11,7 @@
 <meta name="apple-mobile-web-app-title" content="과학구리"/>
 <meta name="theme-color" content="#061442"/>
 <style>html{visibility:hidden}</style>
-<title>학사일정</title>
+<title>학사일정 — 과학구리</title>
 <style>
 .cal-nav{
   display:flex;align-items:center;justify-content:center;gap:18px;
@@ -85,7 +86,7 @@ table.cal-table{
 </head>
 <body>
 <div class="bw-page">
-  <h1 class="bw-page-title">🗓 학사일정</h1>
+  <h1 class="bw-page-title"><span id="bw-egg-cal-trigger" style="cursor:default;">🗓</span> 학사일정</h1>
   <p class="bw-page-sub" id="cal-sub">스프레드시트에서 실시간으로 불러옵니다.</p>
 
   <div class="cal-nav">
@@ -211,6 +212,140 @@ fetch(URL)
     document.getElementById("cal-body").innerHTML =
       `<div class="cal-empty">스프레드시트를 불러오지 못했어요.<br>공유 설정을 확인해주세요.</div>`;
   });
+
+// ============================================================
+// 🥚 이스터에그: 요일 맞추기 — 🗓 아이콘을 3초 안에 3번 탭하면 시작
+// ============================================================
+(function () {
+  const NEEDED = 3, TAP_WINDOW = 3000, ROUNDS = 8;
+  let tapCount = 0, resetTimer = null;
+
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('#bw-egg-cal-trigger');
+    if (!t) return;
+    tapCount++;
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { tapCount = 0; }, TAP_WINDOW);
+    if (tapCount >= NEEDED) {
+      tapCount = 0;
+      if (window.BwEgg) window.BwEgg.revealThen('요일 맞추기 발견!', startGame);
+    }
+  });
+
+  function ensureStyle() {
+    if (document.getElementById('bw-egg-cal-style')) return;
+    const s = document.createElement('style');
+    s.id = 'bw-egg-cal-style';
+    s.textContent = `
+      #bw-egg-cal{position:fixed;inset:0;z-index:999999;background:#040d29;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;
+        padding:24px;animation:bwCalFade .2s ease;}
+      @keyframes bwCalFade{from{opacity:0}to{opacity:1}}
+      .bw-egg-cal-card{background:linear-gradient(180deg,#0d2358,#0a1c47);
+        border:1px solid rgba(255,255,255,.08);border-radius:20px;
+        padding:26px 22px;width:100%;max-width:320px;text-align:center;
+        box-shadow:0 12px 40px rgba(0,0,0,.45);position:relative;}
+      .bw-egg-cal-close{position:absolute;top:12px;right:12px;background:rgba(255,255,255,.1);
+        border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;}
+      .bw-egg-cal-progress{color:rgba(255,255,255,.5);font-size:12px;font-weight:700;margin-bottom:6px;}
+      .bw-egg-cal-q{color:#fff;font-size:19px;font-weight:800;margin:10px 0 18px;line-height:1.4;}
+      .bw-egg-cal-opts{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+      .bw-egg-cal-opt{border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);
+        color:#fff;border-radius:12px;padding:13px 8px;font-weight:800;font-size:15px;
+        cursor:pointer;transition:transform .08s;}
+      .bw-egg-cal-opt:active{transform:scale(.95);}
+      .bw-egg-cal-opt.correct{background:rgba(46,204,113,.3);border-color:#2ecc71;}
+      .bw-egg-cal-opt.wrong{background:rgba(255,45,45,.3);border-color:#ff2d2d;}
+      .bw-egg-cal-score{font-size:40px;font-weight:900;color:#ffec00;margin:8px 0;}
+      .bw-egg-cal-btnrow{display:flex;gap:8px;margin-top:14px;}
+      .bw-egg-cal-btn{border:none;border-radius:12px;padding:11px 16px;font-weight:800;
+        font-size:13.5px;cursor:pointer;flex:1;}
+      .bw-egg-cal-btn.primary{background:linear-gradient(180deg,#ffec00,#ffd400);color:#061442;}
+      .bw-egg-cal-btn.ghost{background:rgba(255,255,255,.08);color:#fff;}
+    `;
+    document.head.appendChild(s);
+  }
+
+  const DOW = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
+
+  function randomQuestion() {
+    // 조금 엉뚱한 재미를 위해 연도 범위를 넓게 잡음 (과거~아주 먼 미래)
+    const year = 1950 + Math.floor(Math.random() * 500); // 1950 ~ 2449
+    const month = 1 + Math.floor(Math.random() * 12);
+    const day = 1 + Math.floor(Math.random() * 28); // 월말 예외 없이 안전하게
+    const d = new Date(year, month - 1, day);
+    const answer = DOW[d.getDay()];
+    const opts = new Set([answer]);
+    while (opts.size < 4) opts.add(DOW[Math.floor(Math.random() * 7)]);
+    const shuffled = [...opts].sort(() => Math.random() - 0.5);
+    return { year, month, day, answer, opts: shuffled };
+  }
+
+  function startGame() {
+    if (document.getElementById('bw-egg-cal')) return;
+    ensureStyle();
+    let round = 0, score = 0, q = null, answering = true;
+
+    const box = document.createElement('div');
+    box.id = 'bw-egg-cal';
+    document.body.appendChild(box);
+
+    function renderQuestion() {
+      round++;
+      q = randomQuestion();
+      answering = true;
+      box.innerHTML = `
+        <div class="bw-egg-cal-card">
+          <button class="bw-egg-cal-close" type="button" aria-label="닫기">✕</button>
+          <div class="bw-egg-cal-progress">${round} / ${ROUNDS}문제 · 맞힌 개수 ${score}개</div>
+          <div class="bw-egg-cal-q">${q.year}년 ${q.month}월 ${q.day}일은<br>무슨 요일일까요?</div>
+          <div class="bw-egg-cal-opts">
+            ${q.opts.map(o => `<button class="bw-egg-cal-opt" data-v="${o}">${o}</button>`).join('')}
+          </div>
+        </div>
+      `;
+      box.querySelector('.bw-egg-cal-close').addEventListener('click', () => box.remove());
+      box.querySelectorAll('.bw-egg-cal-opt').forEach(btn => {
+        btn.addEventListener('click', () => onAnswer(btn.dataset.v, btn));
+      });
+    }
+
+    function onAnswer(value, btnEl) {
+      if (!answering) return;
+      answering = false;
+      const correct = value === q.answer;
+      if (correct) { score++; btnEl.classList.add('correct'); }
+      else {
+        btnEl.classList.add('wrong');
+        box.querySelectorAll('.bw-egg-cal-opt').forEach(b => {
+          if (b.dataset.v === q.answer) b.classList.add('correct');
+        });
+      }
+      setTimeout(() => {
+        if (round >= ROUNDS) renderResult();
+        else renderQuestion();
+      }, 700);
+    }
+
+    function renderResult() {
+      box.innerHTML = `
+        <div class="bw-egg-cal-card">
+          <div class="bw-egg-cal-progress">🗓 요일 맞추기 결과</div>
+          <div class="bw-egg-cal-score">${score} / ${ROUNDS}</div>
+          <div class="bw-egg-cal-btnrow">
+            <button class="bw-egg-cal-btn primary" id="bw-egg-cal-retry">다시 하기</button>
+            <button class="bw-egg-cal-btn ghost" id="bw-egg-cal-done">닫기</button>
+          </div>
+        </div>
+      `;
+      box.querySelector('#bw-egg-cal-retry').addEventListener('click', () => { box.remove(); startGame(); });
+      box.querySelector('#bw-egg-cal-done').addEventListener('click', () => box.remove());
+      if (window.BwEgg) window.BwEgg.submitScore('calendar', score);
+    }
+
+    renderQuestion();
+  }
+})();
 </script>
 </body>
 </html>
