@@ -114,7 +114,7 @@ const MAX_FILE_SIZE=15*1024*1024; // 인증사진 용량 상한(15MB)
 // 벌금 관리자 (요청자 이름 기준 — 실제 권한 검증은 서버(Apps Script)에서도 동일 목록으로 반드시 체크해야 함)
 const FINE_ADMINS=["서준혁","정의찬"];
 
-function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
+function call(a,p){return window.GwakuriAuth.call(a,p);}
 function escH(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML;}
 function fmtW(n){return "$"+Number(n||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});}
 function fmtDate(s){if(!s)return"";const d=new Date(s);if(isNaN(d))return String(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")}`;}
@@ -342,15 +342,20 @@ function openLightbox(url){
   document.body.appendChild(box);
 }
 
-function uploadCloudinary(file,onP){
+async function uploadCloudinary(file,onP){
+  // 서명 업로드: 로그인 토큰이 있어야 서버가 업로드 서명을 내려줘요 (토큰 없으면 업로드 불가)
+  const sig=await window.GwakuriAuth.call("getUploadSignature",{});
+  if(!sig||!sig.success)throw new Error((sig&&sig.message)||"업로드 권한을 확인하지 못했어요. 다시 로그인해주세요.");
   return new Promise((res,rej)=>{
-    if(!CLOUDINARY_CLOUD_NAME||!CLOUDINARY_UPLOAD_PRESET){rej(new Error("업로드 저장소 설정이 안 되어 있어요."));return;}
     const fd=new FormData();
     fd.append("file",file);
-    fd.append("upload_preset",CLOUDINARY_UPLOAD_PRESET);
+    fd.append("api_key",sig.apiKey);
+    fd.append("timestamp",sig.timestamp);
+    fd.append("folder",sig.folder);
+    fd.append("signature",sig.signature);
     const x=new XMLHttpRequest();
-    x.open("POST",`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,true);
-    x.upload.onprogress=e=>{ if(e.lengthComputable&&onP) onP(Math.round(e.loaded/e.total*100)); };
+    x.open("POST",`https://api.cloudinary.com/v1_1/${sig.cloud}/auto/upload`,true);
+    x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};
     x.onload=()=>{
       if(x.status>=200&&x.status<300){
         try{const j=JSON.parse(x.responseText);res({fileUrl:j.secure_url,fileName:file.name});}

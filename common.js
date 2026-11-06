@@ -140,6 +140,10 @@ body{
 }
 .bw-authsubmit:hover{filter:brightness(.96);}
 .bw-authsubmit:disabled{opacity:.6;cursor:default;}
+.bw-emailrow{display:flex;gap:8px;margin-bottom:11px;}
+.bw-emailrow input{margin-bottom:0 !important;flex:1;min-width:0;}
+.bw-mini{flex:0 0 auto;border:none;border-radius:10px;padding:0 13px;font-size:13px;font-weight:700;font-family:var(--ff);background:var(--navy);color:#fff;cursor:pointer;white-space:nowrap;}
+.bw-mini:disabled{opacity:.55;cursor:default;}
 .bw-authmsg{font-size:13px;margin-top:12px;min-height:16px;}
 .bw-authmsg.err{color:#c23b3b;}
 .bw-authmsg.ok{color:#1f8a5c;}
@@ -172,11 +176,22 @@ body{
   const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const sessionStore = isNativeApp ? window.localStorage : window.sessionStorage;
 
+  // 로그인 후에는 모든 요청에 로그인 토큰(authToken)이 자동으로 붙어요.
+  // (서버는 토큰이 없거나 만료/위조면 거부하고, actor/author 같은 값도 토큰 주인으로 덮어써요)
   function authCall(action, params){
-    return fetch(AUTH_SCRIPT_URL, {
-      method: "POST",
-      body: new URLSearchParams(Object.assign({ action }, params || {}))
-    }).then(r => r.json());
+    const body = Object.assign({ action }, params || {});
+    const sess = getSession();
+    if (sess && sess.token && !body.authToken) body.authToken = sess.token;
+    return fetch(AUTH_SCRIPT_URL, { method: "POST", body: new URLSearchParams(body) })
+      .then(r => r.json())
+      .then(r => {
+        // 토큰이 만료됐거나 서버에서 무효 처리된 경우 → 로그인 화면으로
+        if (r && r.code === 'AUTH' && getSession()) {
+          sessionStore.removeItem(SESSION_KEY);
+          location.reload();
+        }
+        return r;
+      });
   }
   function getSession(){
     try{
@@ -188,12 +203,18 @@ body{
     sessionStore.setItem(SESSION_KEY, JSON.stringify(sess));
   }
   function logout(){
-    sessionStore.removeItem(SESSION_KEY);
-    location.reload();
+    const sess = getSession();
+    const done = () => { sessionStore.removeItem(SESSION_KEY); location.reload(); };
+    if (sess && sess.token) {
+      Promise.race([
+        fetch(AUTH_SCRIPT_URL, { method: "POST", body: new URLSearchParams({ action: 'logout', authToken: sess.token }) }),
+        new Promise(r => setTimeout(r, 1500))
+      ]).catch(() => {}).then(done);
+    } else done();
   }
 
   // 다른 페이지(board.html 등)에서 쓸 수 있도록 전역으로 공개
-  window.GwakuriAuth = { getSession, setSession, logout, call: authCall };
+  window.GwakuriAuth = { getSession, setSession, logout, call: authCall, token: () => (getSession() || {}).token || "" };
 
   const session = getSession();
 
@@ -270,6 +291,10 @@ body{
         </div>
         <input id="bw-au" type="text" placeholder="이름" autocomplete="username"/>
         <input id="bw-ap" type="password" placeholder="비밀번호" autocomplete="current-password"/>
+        <div id="bw-su" style="display:none">
+          <div class="bw-emailrow"><input id="bw-ae" type="email" placeholder="이메일 (인증번호를 보내드려요)" autocomplete="email"/><button type="button" class="bw-mini" id="bw-send">인증번호 받기</button></div>
+          <div class="bw-emailrow" id="bw-coderow" style="display:none"><input id="bw-ac" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"/><button type="button" class="bw-mini" id="bw-verify">확인</button></div>
+        </div>
         <button class="bw-authsubmit" id="bw-asubmit" type="button">로그인</button>
         <div class="bw-authmsg" id="bw-amsg"></div>
       </div>`;
@@ -281,41 +306,86 @@ body{
     const msgEl = wrap.querySelector('#bw-amsg');
     const userEl = wrap.querySelector('#bw-au');
     const passEl = wrap.querySelector('#bw-ap');
+    const suBox = wrap.querySelector('#bw-su');
+    const emailEl = wrap.querySelector('#bw-ae');
+    const codeRow = wrap.querySelector('#bw-coderow');
+    const codeEl = wrap.querySelector('#bw-ac');
+    const sendBtn = wrap.querySelector('#bw-send');
+    const verifyBtn = wrap.querySelector('#bw-verify');
+    let emailProof = '', verifiedEmail = '';
+
+    function say(text, cls){ msgEl.textContent = text; msgEl.className = 'bw-authmsg' + (cls ? ' ' + cls : ''); }
 
     tabs.forEach(tab=>{
       tab.addEventListener('click', ()=>{
         mode = tab.dataset.m;
         tabs.forEach(t=>t.classList.toggle('active', t===tab));
         submitBtn.textContent = mode==='login' ? '로그인' : '가입하기';
-        msgEl.textContent=''; msgEl.className='bw-authmsg';
+        suBox.style.display = mode==='signup' ? '' : 'none';
+        passEl.autocomplete = mode==='signup' ? 'new-password' : 'current-password';
+        say('');
       });
+    });
+
+    // 이메일을 바꾸면 인증을 다시 받아야 해요
+    emailEl.addEventListener('input', ()=>{
+      if (emailEl.value.trim().toLowerCase() !== verifiedEmail) { emailProof = ''; verifiedEmail = ''; }
+    });
+
+    sendBtn.addEventListener('click', async ()=>{
+      const email = emailEl.value.trim();
+      if(!email){ say('이메일을 입력해주세요.', 'err'); return; }
+      sendBtn.disabled = true; say('인증번호를 보내는 중...');
+      try{
+        const r = await authCall('requestEmailCode', { purpose:'signup', email, username: userEl.value.trim() });
+        if(r.success){ codeRow.style.display = ''; codeEl.focus(); say(r.message || '인증번호를 보냈어요.', 'ok'); }
+        else say(r.message || '인증번호를 보내지 못했어요.', 'err');
+      }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
+      sendBtn.disabled = false;
+    });
+
+    verifyBtn.addEventListener('click', async ()=>{
+      const email = emailEl.value.trim(), code = codeEl.value.trim();
+      if(code.length !== 6){ say('인증번호 6자리를 입력해주세요.', 'err'); return; }
+      verifyBtn.disabled = true;
+      try{
+        const r = await authCall('verifyEmailCode', { purpose:'signup', email, code, username: userEl.value.trim() });
+        if(r.success){
+          emailProof = r.emailProof; verifiedEmail = email.toLowerCase();
+          codeRow.style.display = 'none'; say('✔ 이메일이 인증됐어요. 가입하기를 눌러주세요.', 'ok');
+        } else say(r.message || '인증에 실패했어요.', 'err');
+      }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
+      verifyBtn.disabled = false;
     });
 
     async function submit(){
       const u = userEl.value.trim(), p = passEl.value;
-      if(!u || !p){ msgEl.textContent='이름과 비밀번호를 모두 입력해주세요.'; msgEl.className='bw-authmsg err'; return; }
+      if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
+      if(mode==='signup' && !emailProof){ say('이메일 인증을 먼저 완료해주세요.', 'err'); return; }
       submitBtn.disabled = true;
-      msgEl.textContent = '처리 중...'; msgEl.className='bw-authmsg';
+      say('처리 중...');
       try{
         const action = mode==='login' ? 'login' : 'signup';
-        const r = await authCall(action, { username:u, password:p });
+        const payload = { username:u, password:p };
+        if(action==='signup'){ payload.email = emailEl.value.trim(); payload.emailProof = emailProof; }
+        const r = await authCall(action, payload);
         if(r.success){
           if(action==='signup'){
-            msgEl.textContent = (r.message||'가입되었습니다. 로그인해주세요.'); msgEl.className='bw-authmsg ok';
+            say(r.message||'가입되었습니다. 로그인해주세요.', 'ok');
             mode='login';
             tabs.forEach(t=>t.classList.toggle('active', t.dataset.m==='login'));
-            submitBtn.textContent='로그인';
-            passEl.value='';
+            submitBtn.textContent='로그인'; suBox.style.display='none';
+            passEl.value=''; emailProof=''; verifiedEmail='';
           } else {
-            setSession({ username:r.username, role:r.role||'user', muted:!!r.muted, ts:Date.now() });
+            setSession({ username:r.username, role:r.role||'user', muted:!!r.muted, token:r.token||'', ts:Date.now() });
             location.reload();
             return;
           }
         } else {
-          msgEl.textContent = r.message || '처리에 실패했어요.'; msgEl.className='bw-authmsg err';
+          say(r.message || '처리에 실패했어요.', 'err');
         }
       }catch(e){
-        msgEl.textContent = '연결 실패. 잠시 후 다시 시도해주세요.'; msgEl.className='bw-authmsg err';
+        say('연결 실패. 잠시 후 다시 시도해주세요.', 'err');
       }
       submitBtn.disabled = false;
     }

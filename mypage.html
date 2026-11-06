@@ -81,6 +81,15 @@
   </div>
 
   <div class="mp-panel">
+    <p class="mp-panel-title">이메일</p>
+    <div class="mp-row"><input id="mp-em" type="email" placeholder="새 이메일 주소" autocomplete="email"/></div>
+    <div class="mp-row" id="mp-code-row" style="display:none"><input id="mp-ec" type="text" inputmode="numeric" maxlength="6" placeholder="메일로 받은 인증번호 6자리"/></div>
+    <button class="mp-btn" id="mp-send">인증번호 받기</button>
+    <button class="mp-btn" id="mp-save" style="display:none">이메일 변경하기</button>
+    <div class="mp-msg" id="mp-emsg"></div>
+  </div>
+
+  <div class="mp-panel">
     <p class="mp-panel-title">비밀번호 변경</p>
     <div class="mp-row"><input id="mp-op" type="password" placeholder="현재 비밀번호" autocomplete="current-password"/></div>
     <div class="mp-row"><input id="mp-np" type="password" placeholder="새 비밀번호" autocomplete="new-password"/></div>
@@ -128,6 +137,7 @@
       const mb = r.muted ? '<span class="mp-badge mp-badge-muted">작성 금지됨</span>' : '';
       infoBox.innerHTML = `
         <div class="mp-info-row"><span>이름</span><b>${escH(r.username)}</b></div>
+        <div class="mp-info-row"><span>이메일</span><b>${escH(r.email || '미등록')}</b></div>
         <div class="mp-info-row"><span>권한</span><span>${rb}${mb}</span></div>
         <div class="mp-info-row"><span>작성한 글</span><b>${r.postCount}개</b></div>
         <div class="mp-info-row"><span>댓글</span><b>${r.commentCount}개</b></div>`;
@@ -145,7 +155,11 @@
       const r = await window.GwakuriAuth.call('changePassword', { username: session.username, oldPassword: op, newPassword: np });
       cpm.textContent = r.message || (r.success ? '완료' : '실패');
       cpm.className = r.success ? 'mp-msg ok' : 'mp-msg err';
-      if(r.success){ opEl.value=''; npEl.value=''; }
+      if(r.success){
+        opEl.value=''; npEl.value='';
+        // 비밀번호를 바꾸면 이전 로그인 토큰은 무효가 되고, 이 기기엔 새 토큰이 와요
+        if(r.token) window.GwakuriAuth.setSession(Object.assign({}, session, { token: r.token }));
+      }
     }catch(e){
       cpm.textContent = '연결 실패. 잠시 후 다시 시도해주세요.'; cpm.className = 'mp-msg err';
     }
@@ -153,6 +167,44 @@
   });
 
   loadInfo();
+
+  // ── 이메일 인증 후 변경 ──────────────────────────────────────────
+  (function(){
+    const emEl = document.getElementById('mp-em'), ecEl = document.getElementById('mp-ec');
+    const codeRow = document.getElementById('mp-code-row');
+    const sendBtn = document.getElementById('mp-send'), saveBtn = document.getElementById('mp-save');
+    const msg = document.getElementById('mp-emsg');
+    let proof = '', proofEmail = '';
+    function say(t, cls){ msg.textContent = t; msg.className = 'mp-msg' + (cls ? ' ' + cls : ''); }
+    emEl.addEventListener('input', ()=>{ if(emEl.value.trim().toLowerCase() !== proofEmail){ proof=''; proofEmail=''; } });
+    sendBtn.addEventListener('click', async ()=>{
+      const email = emEl.value.trim();
+      if(!email){ say('새 이메일을 입력해주세요.', 'err'); return; }
+      sendBtn.disabled = true; say('인증번호를 보내는 중...');
+      try{
+        const r = await window.GwakuriAuth.call('requestEmailCode', { purpose:'update', email });
+        if(r.success){ codeRow.style.display=''; saveBtn.style.display=''; say(r.message || '인증번호를 보냈어요.', 'ok'); }
+        else say(r.message || '인증번호를 보내지 못했어요.', 'err');
+      }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
+      sendBtn.disabled = false;
+    });
+    saveBtn.addEventListener('click', async ()=>{
+      const email = emEl.value.trim(), code = ecEl.value.trim();
+      if(code.length !== 6){ say('인증번호 6자리를 입력해주세요.', 'err'); return; }
+      saveBtn.disabled = true;
+      try{
+        if(!proof){
+          const v = await window.GwakuriAuth.call('verifyEmailCode', { purpose:'update', email, code });
+          if(!v.success){ say(v.message || '인증에 실패했어요.', 'err'); saveBtn.disabled=false; return; }
+          proof = v.emailProof; proofEmail = email.toLowerCase();
+        }
+        const r = await window.GwakuriAuth.call('updateEmail', { email, emailProof: proof });
+        say(r.message || (r.success ? '이메일을 바꿨어요.' : '변경에 실패했어요.'), r.success ? 'ok' : 'err');
+        if(r.success){ codeRow.style.display='none'; saveBtn.style.display='none'; emEl.value=''; ecEl.value=''; proof=''; proofEmail=''; loadInfo(); }
+      }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
+      saveBtn.disabled = false;
+    });
+  })();
 
   // ── 관리자/매니저 전용: 게시글·회원 관리 ──────────────────────────
   const isManager = session.role === 'admin' || session.role === 'manager';
