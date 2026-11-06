@@ -214,7 +214,8 @@
     try {
       const res = await fetch(SCRIPT_URL, {
         method: 'POST',
-        body: new URLSearchParams({ action: 'registerDeviceToken', actor: username, token, platform: 'android' })
+        body: new URLSearchParams({ action: 'registerDeviceToken', actor: username, token, platform: 'android',
+          authToken: ((window.GwakuriAuth && window.GwakuriAuth.getSession()) || {}).token || '' })
       });
       const r = await res.json();
       if (r && r.success && Preferences) {

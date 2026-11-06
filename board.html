@@ -151,7 +151,7 @@ const _session=(window.GwakuriAuth&&window.GwakuriAuth.getSession())||null;
 let S={user:_session?_session.username:null,role:_session?_session.role:null,muted:_session?!!_session.muted:false,view:"list",posts:[],currentPost:null,comments:[],selectedFile:null,uploading:false,adminUsers:[]};
 
 const app=document.getElementById("gb-app"),userbar=document.getElementById("gb-userbar");
-function call(a,p){return fetch(SCRIPT_URL,{method:"POST",body:new URLSearchParams({action:a,...p})}).then(r=>r.json());}
+function call(a,p){return window.GwakuriAuth.call(a,p);}
 function esc(s){const d=document.createElement("div");d.textContent=String(s??"")}
 function escH(s){const d=document.createElement("div");d.textContent=String(s??"");return d.innerHTML;}
 function fmtD(d){const dt=new Date(d);if(isNaN(dt))return"";return dt.getFullYear()+"."+String(dt.getMonth()+1).padStart(2,"0")+"."+String(dt.getDate()).padStart(2,"0")+" "+String(dt.getHours()).padStart(2,"0")+":"+String(dt.getMinutes()).padStart(2,"0");}
@@ -212,17 +212,19 @@ function renderFP(){
     document.getElementById("gb-rm").onclick=()=>{S.selectedFile=null;renderFP();};
   }
 }
-function uploadCloudinary(file,onP){
+async function uploadCloudinary(file,onP){
+  // 서명 업로드: 로그인 토큰이 있어야 서버가 업로드 서명을 내려줘요 (토큰 없으면 업로드 불가)
+  const sig=await window.GwakuriAuth.call("getUploadSignature",{});
+  if(!sig||!sig.success)throw new Error((sig&&sig.message)||"업로드 권한을 확인하지 못했어요. 다시 로그인해주세요.");
   return new Promise((res,rej)=>{
-    if(!CLOUDINARY_CLOUD_NAME||CLOUDINARY_CLOUD_NAME.indexOf("여기에")===0||!CLOUDINARY_UPLOAD_PRESET||CLOUDINARY_UPLOAD_PRESET.indexOf("여기에")===0){
-      rej(new Error("사진 업로드 저장소(Cloudinary) 설정이 아직 안 되어 있어요. 관리자에게 문의해주세요."));
-      return;
-    }
     const fd=new FormData();
     fd.append("file",file);
-    fd.append("upload_preset",CLOUDINARY_UPLOAD_PRESET);
+    fd.append("api_key",sig.apiKey);
+    fd.append("timestamp",sig.timestamp);
+    fd.append("folder",sig.folder);
+    fd.append("signature",sig.signature);
     const x=new XMLHttpRequest();
-    x.open("POST",`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`,true);
+    x.open("POST",`https://api.cloudinary.com/v1_1/${sig.cloud}/auto/upload`,true);
     x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};
     x.onload=()=>{
       if(x.status>=200&&x.status<300){

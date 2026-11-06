@@ -284,8 +284,7 @@ fetch(HW_URL)
 // ── 게시판 미리보기 ────────────────────────────────────────
 const SCRIPT_URL = (window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
 
-fetch(SCRIPT_URL, { method:'POST', body: new URLSearchParams({action:'listPosts'}) })
-  .then(r => r.json())
+window.GwakuriAuth.call('listPosts', {})
   .then(res => {
     const posts = (res.success && res.posts.length) ? res.posts.slice(0,4) : [];
     const box = document.getElementById('board-preview');
