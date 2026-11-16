@@ -402,7 +402,7 @@ body{
 // 브라우저는 터치 이벤트가 없어 자연히 아무 영향 없습니다.)
 // ============================================================
 (function () {
-  const THRESHOLD = 70; // 이만큼 당겨야 새로고침 실행 (px)
+  const THRESHOLD = 50; // 이만큼 당겨야 새로고침 실행 (px)
   let startY = 0;
   let pulling = false;
   let indicator = null;
