@@ -362,7 +362,7 @@ body{
       const u = userEl.value.trim(), p = passEl.value;
       if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
       if(mode==='signup' && !emailProof){ say('이메일 인증을 먼저 완료해주세요.', 'err'); return; }
-      submitBtn.disabled = false;
+      submitBtn.disabled = true;
       say('처리 중...');
       try{
         const action = mode==='login' ? 'login' : 'signup';
