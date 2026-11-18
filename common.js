@@ -1,4 +1,3 @@
-// ── Bestwing Common (앱 전체 로그인 + 네비/푸터) ─────────────────
 (function () {
   const STYLE = `
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
@@ -294,11 +293,11 @@ body{
         <div id="bw-su" style="display:none">
           <div class="bw-emailrow">
             <input id="bw-ae" type="email" placeholder="이메일" autocomplete="email"/>
-            <!-- 이메일 인증을 다시 켤 때 아래 인증 UI 주석을 해제하세요.
             <button type="button" class="bw-mini" id="bw-send">인증번호 받기</button>
-            </div>
-            <div class="bw-emailrow" id="bw-coderow" style="display:none"><input id="bw-ac" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"/><button type="button" class="bw-mini" id="bw-verify">확인</button></div>
-            -->
+          </div>
+          <div class="bw-emailrow" id="bw-coderow" style="display:none">
+            <input id="bw-ac" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"/>
+            <button type="button" class="bw-mini" id="bw-verify">확인</button>
           </div>
         </div>
         <button class="bw-authsubmit" id="bw-asubmit" type="button">로그인</button>
@@ -333,7 +332,6 @@ body{
       });
     });
 
-    /*
     emailEl.addEventListener('input', ()=>{
       if (emailEl.value.trim().toLowerCase() !== verifiedEmail) { emailProof = ''; verifiedEmail = ''; }
     });
@@ -363,21 +361,23 @@ body{
       }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
       verifyBtn.disabled = false;
     });
-    */
 
     async function submit(){
       const u = userEl.value.trim(), p = passEl.value;
       if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
-      // 이메일 인증을 다시 켤 때 아래 가입 차단 줄의 주석을 해제하세요.
-      // if(mode==='signup' && !emailProof){ say('이메일 인증을 먼저 완료해주세요.', 'err'); return; }
+      if(mode==='signup' && (!emailProof || emailEl.value.trim().toLowerCase() !== verifiedEmail)){
+        say('이메일 인증을 먼저 완료해주세요.', 'err');
+        return;
+      }
       submitBtn.disabled = true;
       say('처리 중...');
       try{
         const action = mode==='login' ? 'login' : 'signup';
         const payload = { username:u, password:p };
-        if(action==='signup') payload.email = emailEl.value.trim();
-        // 이메일 인증을 다시 켤 때 아래 줄의 주석을 해제하세요.
-        // if(action==='signup'){ payload.email = emailEl.value.trim(); payload.emailProof = emailProof; }
+        if(action==='signup'){
+          payload.email = emailEl.value.trim();
+          payload.emailProof = emailProof;
+        }
         const r = await authCall(action, payload);
         if(r.success){
           if(action==='signup'){
@@ -405,12 +405,6 @@ body{
   }
 })();
 
-// ============================================================
-// 당겨서 새로고침 (Pull-to-refresh) — 모든 페이지 공통 적용
-// 화면 맨 위에서 아래로 당기면 새로고침됩니다.
-// (터치 기반이라 폰 앱/모바일 브라우저에서만 동작하고, 데스크톱
-// 브라우저는 터치 이벤트가 없어 자연히 아무 영향 없습니다.)
-// ============================================================
 (function () {
   const THRESHOLD = 50; // 이만큼 당겨야 새로고침 실행 (px)
   let startY = 0;
@@ -470,13 +464,6 @@ body{
   }, { passive: true });
 })();
 
-// ============================================================
-// 좁은 화면(폰) 자동 최적화 — 같은 코드, 화면 크기에 따라 CSS로만 조정
-// 이 앱은 안드로이드 전용이라 항상 세로 모드의 좁은 화면에서 열립니다.
-// 별도의 "모바일 전용 페이지"를 따로 만들면 두 벌의 코드를 계속 같이
-// 관리해야 해서 더 위험합니다 — 대신 화면 폭에 따라 자동으로 버튼/입력
-// 요소 크기를 조정하는 전역 규칙 하나만 추가합니다.
-// ============================================================
 (function () {
   const style = document.createElement('style');
   style.textContent = `
