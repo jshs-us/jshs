@@ -294,11 +294,11 @@ body{
         <div id="bw-su" style="display:none">
           <div class="bw-emailrow">
             <input id="bw-ae" type="email" placeholder="이메일" autocomplete="email"/>
-            <!-- 이메일 인증을 다시 켤 때 아래 인증 UI 주석을 해제하세요.
             <button type="button" class="bw-mini" id="bw-send">인증번호 받기</button>
-            </div>
-            <div class="bw-emailrow" id="bw-coderow" style="display:none"><input id="bw-ac" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"/><button type="button" class="bw-mini" id="bw-verify">확인</button></div>
-            -->
+          </div>
+          <div class="bw-emailrow" id="bw-coderow" style="display:none">
+            <input id="bw-ac" type="text" inputmode="numeric" maxlength="6" placeholder="인증번호 6자리"/>
+            <button type="button" class="bw-mini" id="bw-verify">확인</button>
           </div>
         </div>
         <button class="bw-authsubmit" id="bw-asubmit" type="button">로그인</button>
@@ -333,7 +333,6 @@ body{
       });
     });
 
-    /*
     emailEl.addEventListener('input', ()=>{
       if (emailEl.value.trim().toLowerCase() !== verifiedEmail) { emailProof = ''; verifiedEmail = ''; }
     });
@@ -363,21 +362,23 @@ body{
       }catch(e){ say('연결 실패. 잠시 후 다시 시도해주세요.', 'err'); }
       verifyBtn.disabled = false;
     });
-    */
 
     async function submit(){
       const u = userEl.value.trim(), p = passEl.value;
       if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
-      // 이메일 인증을 다시 켤 때 아래 가입 차단 줄의 주석을 해제하세요.
-      // if(mode==='signup' && !emailProof){ say('이메일 인증을 먼저 완료해주세요.', 'err'); return; }
+      if(mode==='signup' && (!emailProof || emailEl.value.trim().toLowerCase() !== verifiedEmail)){
+        say('이메일 인증을 먼저 완료해주세요.', 'err');
+        return;
+      }
       submitBtn.disabled = true;
       say('처리 중...');
       try{
         const action = mode==='login' ? 'login' : 'signup';
         const payload = { username:u, password:p };
-        if(action==='signup') payload.email = emailEl.value.trim();
-        // 이메일 인증을 다시 켤 때 아래 줄의 주석을 해제하세요.
-        // if(action==='signup'){ payload.email = emailEl.value.trim(); payload.emailProof = emailProof; }
+        if(action==='signup'){
+          payload.email = emailEl.value.trim();
+          payload.emailProof = emailProof;
+        }
         const r = await authCall(action, payload);
         if(r.success){
           if(action==='signup'){
