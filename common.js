@@ -248,7 +248,7 @@ body{
 <footer class="bw-footer">
   과학구리 정보 제공 ${isNativeApp ? '앱' : '사이트'} &nbsp;·&nbsp; Made by <strong style="color:rgba(255,255,255,.6)" id="bw-egg-hub-trigger">Jvnxyk</strong>
   &nbsp;&nbsp;|&nbsp;&nbsp;
-  문의: <a href="mailto:roysjh7@gmail.com">roysjh7@gmail.com</a>
+  문의·제안: <a href="board.html">게시판에 글 남기기</a>
 </footer>`;
   document.body.insertAdjacentHTML('beforeend',FOOT);
 

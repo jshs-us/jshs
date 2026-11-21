@@ -27,7 +27,15 @@
 | `admin.html` | 관리자 정보 |
 
 ## 배포
-사이트는 GitHub Pages의 프로젝트 사이트로 제공됩니다. 정적 파일의 변경 사항을 저장소의 기본 배포 브랜치에 반영하면 Pages 설정에 따라 배포됩니다.
+GitHub Pages는 GitHub Actions가 `dist` 폴더의 최소화된 파일만 배포하도록 구성합니다.
+
+1. 저장소 Settings > Pages에서 Build and deployment의 Source를 **GitHub Actions**로 설정합니다.
+2. 기본 브랜치에 변경 사항을 푸시하거나 Actions에서 `Deploy minified site to GitHub Pages`를 수동 실행합니다.
+3. 로컬 빌드는 Node.js 설치 후 `npm ci`와 `npm run build`를 실행합니다. 산출물은 `dist`에 생성됩니다.
+
+빌드 과정은 HTML·인라인 CSS·인라인 JavaScript의 공백과 주석을 제거하고 외부 JavaScript를 압축합니다. 백엔드 `.gs`, 문서, 빌드 도구 및 원본 소스 디렉터리는 Pages 산출물에 포함되지 않습니다.
+
+최소화는 코드를 숨기는 보안 기능이 아닙니다. 사이트에 전달된 코드는 브라우저 개발자 도구로 확인할 수 있고, 저장소가 공개라면 원본도 저장소에서 볼 수 있습니다. 비밀번호, API 비밀키, 토큰 서명키 등 비밀값은 프론트엔드에 넣지 말고 서버 스크립트 속성에만 보관하세요. 저장소 원본까지 비공개로 유지하려면 저장소 공개 범위와 GitHub Pages 사용 조건을 확인해야 합니다.
 
 ## Apps Script 백엔드 설치
 
