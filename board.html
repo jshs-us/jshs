@@ -198,7 +198,7 @@ function rWrite(){
     m.textContent="등록 중...";m.className="msg";
     try{const pa={title:ti,content:co,author:S.user};if(fu){pa.fileUrlDirect=fu;pa.fileNameDirect=fn;}
       const r=await call("createPostDirect",pa);
-      if(r.success){S.selectedFile=null;S.view="list";await loadPosts();}else{m.textContent=r.message;m.className="msg err";}}
+      if(r.success){S.selectedFile=null;S.view="list";S.posts.unshift(r.post);render();}else{m.textContent=r.message;m.className="msg err";}}
     catch(e){m.textContent="등록에 실패했습니다.";m.className="msg err";}
   };
 }

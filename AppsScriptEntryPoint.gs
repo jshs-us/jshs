@@ -383,10 +383,30 @@ function setByHeader_(sheet, rowIndex, header, value) {
 }
 
 function findMember_(username) {
-  const target = String(username || '').trim().toLowerCase();
-  return tableRows_('members').find(function (row) {
-    return String(row.username || '').trim().toLowerCase() === target;
-  }) || null;
+  const target = String(username || '').trim();
+  if (!target) return null;
+  const sheet = table_('members');
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return null;
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  const usernameCol = headers.indexOf('username');
+  if (usernameCol < 0) throw new Error('회원 탭에서 username 열을 찾을 수 없어요.');
+  const finder = sheet.getRange(2, usernameCol + 1, lastRow - 1, 1)
+    .createTextFinder(target)
+    .matchCase(false);
+  let found = finder.findNext();
+  while (found && !sameName_(found.getDisplayValue(), target)) {
+    found = finder.findNext();
+  }
+  if (!found) return null;
+  const row = { __row: found.getRow() };
+  sheet.getRange(found.getRow(), 1, 1, lastCol).getValues()[0].forEach(function (value, col) {
+    row[headers[col]] = value;
+  });
+  return row;
 }
 
 function findMemberByEmail_(email) {
@@ -620,10 +640,23 @@ function postObject_(row) {
   };
 }
 
+function postSummaryObject_(row) {
+  return {
+    id: String(row.id),
+    title: String(row.title || ''),
+    author: String(row.author || ''),
+    createdAt: row.createdAt,
+    fileUrl: String(row.fileUrl || ''),
+    fileName: String(row.fileName || ''),
+    likes: Number(row.likes || 0),
+    views: Number(row.views || 0)
+  };
+}
+
 function actionListPosts_() {
   const posts = tableRows_('posts').filter(function (row) { return !truthy_(row.deleted); });
   posts.sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
-  return { success: true, posts: posts.map(postObject_) };
+  return { success: true, posts: posts.map(postSummaryObject_) };
 }
 
 function actionGetPost_(p) {

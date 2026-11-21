@@ -129,19 +129,30 @@ var Security = (function () {
     var lock = LockService.getScriptLock();
     lock.waitLock(3000);
     try {
-      var cacheKey = 'rl:' + sha256_(key);
-      var count = parseInt(cache.get(cacheKey) || '0', 10) + 1;
-      cache.put(cacheKey, String(count), Math.min(windowSec, 21600));
-      return count <= limit;
+      return rateHitLocked_(cache, key, limit, windowSec);
     } finally {
       lock.releaseLock();
     }
   }
 
+  function rateHitLocked_(cache, key, limit, windowSec) {
+    var cacheKey = 'rl:' + sha256_(key);
+    var count = parseInt(cache.get(cacheKey) || '0', 10) + 1;
+    cache.put(cacheKey, String(count), Math.min(windowSec, 21600));
+    return count <= limit;
+  }
+
   function rateOk_(action, identity) {
-    if (!rateHit_('global', CONFIG.GLOBAL_RATE.limit, CONFIG.GLOBAL_RATE.windowSec)) return false;
-    var rule = CONFIG.RATE[action] || CONFIG.RATE._default;
-    return rateHit_(action + ':' + identity, rule.limit, rule.windowSec);
+    var lock = LockService.getScriptLock();
+    lock.waitLock(3000);
+    try {
+      var cache = CacheService.getScriptCache();
+      if (!rateHitLocked_(cache, 'global', CONFIG.GLOBAL_RATE.limit, CONFIG.GLOBAL_RATE.windowSec)) return false;
+      var rule = CONFIG.RATE[action] || CONFIG.RATE._default;
+      return rateHitLocked_(cache, action + ':' + identity, rule.limit, rule.windowSec);
+    } finally {
+      lock.releaseLock();
+    }
   }
 
   function userCodeKey_(purpose, email) {
