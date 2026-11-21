@@ -3,7 +3,7 @@ const APP_DB_SPREADSHEET_ID = '1YKZiIhG2btyLzf49e10yl3HjpDhNi-wtZ2b1kSC9G4c';
 const APP_TABLES = {
   members: {
     name: '회원',
-    headers: ['username', 'password', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder'],
+    headers: ['username', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder'],
     appendMissing: true
   },
   posts: {
@@ -40,6 +40,7 @@ const APP_TABLES = {
 };
 
 const PASSWORD_ITERATIONS = 60000;
+const PASSWORD_HASH_PREFIX = 'v2$';
 const PASSWORD_MIN_LENGTH = 8;
 const MAX_POST_TITLE = 120;
 const MAX_POST_CONTENT = 12000;
@@ -165,9 +166,10 @@ function resetMemberPasswordFromEditor() {
   withWriteLock_(function () {
     const member = findMember_(username);
     if (!member) throw new Error('회원을 찾을 수 없어요: ' + username);
-    setByHeader_(table_('members'), member.__row, 'passwordSalt', salt);
-    setByHeader_(table_('members'), member.__row, 'passwordHash', hash);
-    setByHeader_(table_('members'), member.__row, 'password', '');
+    const sheet = table_('members');
+    setByHeader_(sheet, member.__row, 'passwordSalt', salt);
+    setByHeader_(sheet, member.__row, 'passwordHash', hash);
+    clearLegacyPassword_(sheet, member.__row);
   });
   Security.bumpTokenVersion(username);
   props.deleteProperty('RESET_MEMBER_USERNAME');
@@ -382,6 +384,75 @@ function setByHeader_(sheet, rowIndex, header, value) {
   cell.setValue(value);
 }
 
+function legacyPasswordValue_(row) {
+  return String(row.password || row['비밀번호'] || '');
+}
+
+function clearLegacyPassword_(sheet, rowIndex) {
+  const lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return;
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  headers.forEach(function (header, index) {
+    if (header === 'password' || header === '비밀번호') {
+      sheet.getRange(rowIndex, index + 1).clearContent();
+    }
+  });
+}
+
+function removeLegacyPasswordColumns() {
+  return withWriteLock_(function () {
+    const sheet = table_('members');
+    const lastCol = sheet.getLastColumn();
+    const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(function (value) {
+      return String(value).trim();
+    });
+    const columns = [];
+    headers.forEach(function (header, index) {
+      if (header === 'password' || header === '비밀번호') columns.push(index + 1);
+    });
+    if (!columns.length) return '삭제할 기존 비밀번호 열이 없어요.';
+
+    const usernameCol = headers.indexOf('username');
+    const legacyUsernameCol = headers.indexOf('이름');
+    const saltCol = headers.indexOf('passwordSalt');
+    const hashCol = headers.indexOf('passwordHash');
+    if (usernameCol < 0 || saltCol < 0 || hashCol < 0) {
+      throw new Error('회원 이름, passwordSalt, passwordHash 열을 확인할 수 없어 삭제하지 않았어요.');
+    }
+    const rowCount = Math.max(0, sheet.getLastRow() - 1);
+    if (rowCount) {
+      const usernames = sheet.getRange(2, usernameCol + 1, rowCount, 1).getValues();
+      const legacyUsernames = legacyUsernameCol < 0
+        ? []
+        : sheet.getRange(2, legacyUsernameCol + 1, rowCount, 1).getValues();
+      const salts = sheet.getRange(2, saltCol + 1, rowCount, 1).getValues();
+      const hashes = sheet.getRange(2, hashCol + 1, rowCount, 1).getValues();
+      let unsupportedAccounts = 0;
+      for (let i = 0; i < rowCount; i++) {
+        const username = String(usernames[i][0] || (legacyUsernames[i] && legacyUsernames[i][0]) || '').trim();
+        if (!username) continue;
+        const salt = String(salts[i][0] || '').trim();
+        const hash = String(hashes[i][0] || '').trim();
+        const supportedHash = /^v2\$[A-Za-z0-9+/]{43}=$/.test(hash) || /^[A-Za-z0-9+/]{43}=$/.test(hash);
+        if (!salt || !supportedHash) {
+          unsupportedAccounts++;
+        }
+      }
+      if (unsupportedAccounts) {
+        throw new Error('비밀번호 해시가 확인되지 않는 회원이 ' + unsupportedAccounts +
+          '명 있어 열을 삭제하지 않았어요. 해당 회원의 비밀번호를 먼저 재설정해주세요.');
+      }
+    }
+
+    columns.sort(function (a, b) { return b - a; }).forEach(function (column) {
+      sheet.deleteColumn(column);
+    });
+    return '기존 평문 비밀번호 열을 삭제했어요. 저장된 솔트와 해시는 유지됩니다.';
+  });
+}
+
 function findMember_(username) {
   const target = String(username || '').trim();
   if (!target) return null;
@@ -427,7 +498,7 @@ function memberForSecurity_(username) {
     isFounder: truthy_(row.isFounder),
     salt: String(row.passwordSalt || ''),
     passwordHash: String(row.passwordHash || ''),
-    legacyPassword: String(row.password || ''),
+    legacyPassword: legacyPasswordValue_(row),
     row: row.__row
   };
 }
@@ -495,6 +566,34 @@ function withWriteLock_(callback) {
 }
 
 function passwordHash_(password, salt) {
+  const pepper = passwordPepper_();
+  const value = 'gwakuri-password-v2\u0000' + String(salt) + '\u0000' + String(password);
+  return PASSWORD_HASH_PREFIX + Utilities.base64Encode(
+    Utilities.computeHmacSha256Signature(Utilities.newBlob(value).getBytes(), pepper)
+  );
+}
+
+function passwordPepper_() {
+  const properties = PropertiesService.getScriptProperties();
+  let pepper = properties.getProperty('PASSWORD_PEPPER');
+  if (pepper && pepper.length >= 32) return pepper;
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    pepper = properties.getProperty('PASSWORD_PEPPER');
+    if (!pepper) {
+      pepper = Utilities.getUuid() + Utilities.getUuid() + Utilities.getUuid();
+      properties.setProperty('PASSWORD_PEPPER', pepper);
+    }
+    if (pepper.length < 32) throw new Error('PASSWORD_PEPPER 설정이 올바르지 않아요.');
+    return pepper;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function legacyPasswordHash_(password, salt) {
   const key = Utilities.newBlob(String(password)).getBytes();
   const saltBytes = Utilities.newBlob(String(salt)).getBytes().concat([0, 0, 0, 1]);
   let u = Utilities.computeHmacSha256Signature(saltBytes, key);
@@ -506,12 +605,32 @@ function passwordHash_(password, salt) {
   return Utilities.base64Encode(result);
 }
 
+function legacySha256PasswordHash_(password) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(password))
+    .map(function (byte) {
+      return ('0' + (byte < 0 ? byte + 256 : byte).toString(16)).slice(-2);
+    }).join('');
+}
+
 function passwordMatches_(password, salt, expected) {
-  if (!salt || !expected) return false;
-  const actual = passwordHash_(password, salt);
-  if (actual.length !== expected.length) return false;
+  const storedHash = String(expected || '');
+  if (!storedHash) return false;
+  let actual;
+  let comparableHash = storedHash;
+  if (/^[a-f0-9]{64}$/i.test(storedHash)) {
+    actual = legacySha256PasswordHash_(password);
+    comparableHash = storedHash.toLowerCase();
+  } else if (storedHash.indexOf(PASSWORD_HASH_PREFIX) === 0) {
+    if (!salt || !/^v2\$[A-Za-z0-9+/]{43}=$/.test(storedHash)) return false;
+    actual = passwordHash_(password, salt);
+  } else if (salt && /^[A-Za-z0-9+/]{43}=$/.test(storedHash)) {
+    actual = legacyPasswordHash_(password, salt);
+  } else {
+    return false;
+  }
+  if (actual.length !== comparableHash.length) return false;
   let mismatch = 0;
-  for (let i = 0; i < actual.length; i++) mismatch |= actual.charCodeAt(i) ^ expected.charCodeAt(i);
+  for (let i = 0; i < actual.length; i++) mismatch |= actual.charCodeAt(i) ^ comparableHash.charCodeAt(i);
   return mismatch === 0;
 }
 
@@ -539,7 +658,7 @@ function actionSignup_(p) {
     const sheet = table_('members');
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     const values = {
-      username: username, password: '', role: 'user', muted: false, email: email,
+      username: username, role: 'user', muted: false, email: email,
       passwordSalt: salt, passwordHash: hash, createdAt: nowIso_(), isFounder: false
     };
     appendRow_(sheet, headers.map(function (header) { return values[header] == null ? '' : values[header]; }));
@@ -556,19 +675,25 @@ function actionLogin_(p) {
     passwordHash_(password, 'invalid-user-salt');
     throw new Error('이름 또는 비밀번호를 확인해주세요.');
   }
-  if (!passwordMatches_(password, member.salt, member.passwordHash)) {
-    if (!member.legacyPassword || member.legacyPassword !== password) {
-      throw new Error('이름 또는 비밀번호를 확인해주세요.');
-    }
+  let validPassword = passwordMatches_(password, member.salt, member.passwordHash);
+  if (!validPassword && member.legacyPassword && member.legacyPassword === password) {
+    validPassword = true;
+  }
+  if (!validPassword) throw new Error('이름 또는 비밀번호를 확인해주세요.');
+
+  if (member.passwordHash.indexOf(PASSWORD_HASH_PREFIX) !== 0 || member.legacyPassword) {
     const salt = Utilities.getUuid() + Utilities.getUuid();
     const hash = passwordHash_(password, salt);
     withWriteLock_(function () {
       const latest = findMember_(username);
-      if (!latest || latest.password !== password) throw new Error('계정 정보가 변경되었어요. 다시 로그인해주세요.');
+      if (!latest || String(latest.passwordHash || '') !== member.passwordHash ||
+          legacyPasswordValue_(latest) !== member.legacyPassword) {
+        throw new Error('계정 정보가 변경되었어요. 다시 로그인해주세요.');
+      }
       const sheet = table_('members');
       setByHeader_(sheet, latest.__row, 'passwordSalt', salt);
       setByHeader_(sheet, latest.__row, 'passwordHash', hash);
-      setByHeader_(sheet, latest.__row, 'password', '');
+      clearLegacyPassword_(sheet, latest.__row);
     });
   }
   return {
@@ -594,13 +719,14 @@ function actionChangePassword_(p) {
   const hash = passwordHash_(newPassword, salt);
   withWriteLock_(function () {
     const latest = findMember_(username);
-    if (!latest || !passwordMatches_(oldPassword, latest.passwordSalt, latest.passwordHash)) {
+    if (!latest || String(latest.passwordSalt || '') !== member.salt ||
+        String(latest.passwordHash || '') !== member.passwordHash) {
       throw new Error('현재 비밀번호가 변경되었어요. 다시 로그인해주세요.');
     }
     const sheet = table_('members');
     setByHeader_(sheet, latest.__row, 'passwordSalt', salt);
     setByHeader_(sheet, latest.__row, 'passwordHash', hash);
-    setByHeader_(sheet, latest.__row, 'password', '');
+    clearLegacyPassword_(sheet, latest.__row);
   });
   return { success: true, message: '비밀번호를 변경했어요.' };
 }
@@ -856,9 +982,10 @@ function actionResetPassword_(p) {
   withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);
-    setByHeader_(table_('members'), member.__row, 'passwordSalt', salt);
-    setByHeader_(table_('members'), member.__row, 'passwordHash', hash);
-    setByHeader_(table_('members'), member.__row, 'password', '');
+    const sheet = table_('members');
+    setByHeader_(sheet, member.__row, 'passwordSalt', salt);
+    setByHeader_(sheet, member.__row, 'passwordHash', hash);
+    clearLegacyPassword_(sheet, member.__row);
   });
   return { success: true, message: '임시 비밀번호: ' + temporaryPassword + ' (로그인 후 즉시 변경해주세요.)' };
 }

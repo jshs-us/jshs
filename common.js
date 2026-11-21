@@ -131,6 +131,15 @@ body{
   margin-bottom:11px;background:#fbfcfe;color:var(--ink);
 }
 .bw-authbox input:focus{outline:none;border-color:var(--navy);background:#fff;}
+.bw-password-row{position:relative;margin-bottom:11px;}
+.bw-password-row input{margin-bottom:0;padding-right:52px;}
+.bw-password-toggle{
+  position:absolute;top:50%;right:8px;transform:translateY(-50%);
+  width:36px;height:36px;display:grid;place-items:center;
+  border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;
+}
+.bw-password-toggle:hover{background:var(--paper);color:var(--navy);}
+.bw-password-toggle svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .bw-authsubmit{
   width:100%;background:var(--yellow);color:var(--navy2);
   border:none;border-radius:10px;padding:13px 0;
@@ -291,8 +300,19 @@ body{
           <button type="button" class="bw-authtab" data-m="signup">회원가입</button>
         </div>
         <input id="bw-au" type="text" placeholder="이름" autocomplete="username"/>
-        <input id="bw-ap" type="password" placeholder="비밀번호" autocomplete="current-password"/>
+        <div class="bw-password-row">
+          <input id="bw-ap" type="password" maxlength="128" placeholder="비밀번호" autocomplete="current-password"/>
+          <button type="button" class="bw-password-toggle" id="bw-ap-toggle" aria-label="비밀번호 표시" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
         <div id="bw-su" style="display:none">
+          <div class="bw-password-row">
+            <input id="bw-ap-confirm" type="password" maxlength="128" placeholder="비밀번호 확인" autocomplete="new-password"/>
+            <button type="button" class="bw-password-toggle" id="bw-ap-confirm-toggle" aria-label="비밀번호 표시" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
           <div class="bw-emailrow">
             <input id="bw-ae" type="email" placeholder="이메일" autocomplete="email"/>
             <button type="button" class="bw-mini" id="bw-send">인증번호 받기</button>
@@ -313,6 +333,9 @@ body{
     const msgEl = wrap.querySelector('#bw-amsg');
     const userEl = wrap.querySelector('#bw-au');
     const passEl = wrap.querySelector('#bw-ap');
+    const passConfirmEl = wrap.querySelector('#bw-ap-confirm');
+    const passToggle = wrap.querySelector('#bw-ap-toggle');
+    const passConfirmToggle = wrap.querySelector('#bw-ap-confirm-toggle');
     const suBox = wrap.querySelector('#bw-su');
     const emailEl = wrap.querySelector('#bw-ae');
     const codeRow = wrap.querySelector('#bw-coderow');
@@ -323,6 +346,22 @@ body{
 
     function say(text, cls){ msgEl.textContent = text; msgEl.className = 'bw-authmsg' + (cls ? ' ' + cls : ''); }
 
+    function setPasswordVisibility(input, button, visible){
+      input.type = visible ? 'text' : 'password';
+      button.setAttribute('aria-pressed', String(visible));
+      button.setAttribute('aria-label', visible ? '비밀번호 숨기기' : '비밀번호 표시');
+      button.innerHTML = visible
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a15.7 15.7 0 0 1-3.1 3.8"/><path d="M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10.7 10.7 0 0 0 3-.4"/></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+    }
+
+    passToggle.addEventListener('click', ()=>{
+      setPasswordVisibility(passEl, passToggle, passEl.type === 'password');
+    });
+    passConfirmToggle.addEventListener('click', ()=>{
+      setPasswordVisibility(passConfirmEl, passConfirmToggle, passConfirmEl.type === 'password');
+    });
+
     tabs.forEach(tab=>{
       tab.addEventListener('click', ()=>{
         mode = tab.dataset.m;
@@ -330,6 +369,9 @@ body{
         submitBtn.textContent = mode==='login' ? '로그인' : '가입하기';
         suBox.style.display = mode==='signup' ? '' : 'none';
         passEl.autocomplete = mode==='signup' ? 'new-password' : 'current-password';
+        passConfirmEl.value = '';
+        setPasswordVisibility(passEl, passToggle, false);
+        setPasswordVisibility(passConfirmEl, passConfirmToggle, false);
         say('');
       });
     });
@@ -367,6 +409,8 @@ body{
     async function submit(){
       const u = userEl.value.trim(), p = passEl.value;
       if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
+      if(mode==='signup' && p.length < 8){ say('비밀번호는 8자 이상 입력해주세요.', 'err'); return; }
+      if(mode==='signup' && p !== passConfirmEl.value){ say('비밀번호가 서로 일치하지 않아요.', 'err'); return; }
       if(mode==='signup' && (!emailProof || emailEl.value.trim().toLowerCase() !== verifiedEmail)){
         say('이메일 인증을 먼저 완료해주세요.', 'err');
         return;
@@ -387,7 +431,11 @@ body{
             mode='login';
             tabs.forEach(t=>t.classList.toggle('active', t.dataset.m==='login'));
             submitBtn.textContent='로그인'; suBox.style.display='none';
-            passEl.value=''; emailProof=''; verifiedEmail='';
+            passEl.autocomplete='current-password';
+            passEl.value=''; passConfirmEl.value='';
+            setPasswordVisibility(passEl, passToggle, false);
+            setPasswordVisibility(passConfirmEl, passConfirmToggle, false);
+            emailProof=''; verifiedEmail='';
           } else {
             setSession({ username:r.username, role:r.role||'user', muted:!!r.muted, token:r.token||'', ts:Date.now() });
             location.reload();
@@ -403,6 +451,7 @@ body{
     }
     submitBtn.addEventListener('click', submit);
     passEl.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+    passConfirmEl.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
     userEl.addEventListener('keydown', e=>{ if(e.key==='Enter') passEl.focus(); });
   }
 })();
