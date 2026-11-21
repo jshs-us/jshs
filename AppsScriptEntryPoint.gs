@@ -3,7 +3,10 @@ const APP_DB_SPREADSHEET_ID = '1YKZiIhG2btyLzf49e10yl3HjpDhNi-wtZ2b1kSC9G4c';
 const APP_TABLES = {
   members: {
     name: '회원',
-    headers: ['username', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder'],
+    headers: [
+      'username', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder',
+      'lastLoginAt', 'inactivityBaselineAt', 'inactivity3MonthNoticeAt', 'inactivity5MonthNoticeAt'
+    ],
     appendMissing: true
   },
   posts: {
@@ -123,6 +126,134 @@ function setupBackend() {
   return '초기화 및 기존 데이터 연결 완료: ' + ss.getName() +
     ' (회원 값 ' + migrated.members + '개, 게시글 ' + migrated.posts + ', 댓글 ' + migrated.comments + ', 벌금 ' + migrated.fines +
     ', 기기 토큰 ' + migrated.devices + ', 이스터에그 ' + migrated.eggs + '건 이관)';
+}
+
+function setupInactivityMaintenance() {
+  table_('members');
+  initializeInactivityBaseline_();
+  const handler = 'runInactivityAccountMaintenance';
+  const triggers = ScriptApp.getProjectTriggers().filter(function (trigger) {
+    return trigger.getHandlerFunction() === handler;
+  });
+  if (triggers.length === 1) return '비활성 계정 점검 트리거가 이미 설정되어 있어요.';
+  triggers.forEach(function (trigger) { ScriptApp.deleteTrigger(trigger); });
+  ScriptApp.newTrigger(handler).timeBased().everyDays(1).atHour(3).create();
+  return '비활성 계정 점검 트리거를 매일 오전 3시에 설정했어요.';
+}
+
+function initializeInactivityBaseline_() {
+  const properties = PropertiesService.getScriptProperties();
+  if (properties.getProperty('INACTIVITY_BASELINE_INITIALIZED')) return;
+  withWriteLock_(function () {
+    if (properties.getProperty('INACTIVITY_BASELINE_INITIALIZED')) return;
+    const sheet = table_('members');
+    const baseline = nowIso_();
+    tableRows_('members').forEach(function (member) {
+      if (!member.inactivityBaselineAt) setByHeader_(sheet, member.__row, 'inactivityBaselineAt', baseline);
+    });
+    properties.setProperty('INACTIVITY_BASELINE_INITIALIZED', baseline);
+  });
+}
+
+function runInactivityAccountMaintenance() {
+  const now = new Date();
+  const summary = { sent3Month: 0, sent5Month: 0, deleted: 0, failedEmails: 0, protected: 0 };
+  const members = tableRows_('members').sort(function (a, b) { return b.__row - a.__row; });
+  members.forEach(function (member) {
+    const outcome = withWriteLock_(function () {
+      const current = findMember_(member.username);
+      if (!current) return null;
+      if (isInactivityDeletionProtected_(current)) {
+        return { protected: true };
+      }
+      const lastLogin = parseInactivityDate_(current.lastLoginAt) ||
+        parseInactivityDate_(current.inactivityBaselineAt) || parseInactivityDate_(current.createdAt);
+      if (!lastLogin) {
+        console.warn('[Inactivity maintenance] 로그인 기준일을 확인할 수 없어 건너뜀: ' + current.username);
+        return null;
+      }
+      if (now.getTime() >= addCalendarMonths_(lastLogin, 6).getTime()) {
+        deleteInactiveMember_(current);
+        return { deleted: true };
+      }
+      const result = {};
+      if (now.getTime() >= addCalendarMonths_(lastLogin, 3).getTime() && !current.inactivity3MonthNoticeAt) {
+        if (sendInactivityNotice_(current.email, 3)) {
+          setByHeader_(table_('members'), current.__row, 'inactivity3MonthNoticeAt', nowIso_());
+          result.sent3Month = true;
+        } else {
+          result.failedEmails = (result.failedEmails || 0) + 1;
+        }
+      }
+      if (now.getTime() >= addCalendarMonths_(lastLogin, 5).getTime() && !current.inactivity5MonthNoticeAt) {
+        if (sendInactivityNotice_(current.email, 5)) {
+          setByHeader_(table_('members'), current.__row, 'inactivity5MonthNoticeAt', nowIso_());
+          result.sent5Month = true;
+        } else {
+          result.failedEmails = (result.failedEmails || 0) + 1;
+        }
+      }
+      return result;
+    });
+    if (!outcome) return;
+    if (outcome.protected) summary.protected++;
+    if (outcome.deleted) summary.deleted++;
+    if (outcome.sent3Month) summary.sent3Month++;
+    if (outcome.sent5Month) summary.sent5Month++;
+    summary.failedEmails += outcome.failedEmails || 0;
+  });
+  const result = '비활성 계정 점검 완료: 3개월 안내 ' + summary.sent3Month +
+    '건, 삭제 예정 안내 ' + summary.sent5Month + '건, 계정 삭제 ' + summary.deleted +
+    '건, 이메일 실패 ' + summary.failedEmails + '건, 보호 계정 ' + summary.protected + '건';
+  if (summary.failedEmails) console.error('[Inactivity maintenance] ' + result);
+  return result;
+}
+
+function isInactivityDeletionProtected_(member) {
+  if (truthy_(member.isFounder)) return true;
+  if (normalizeRole_(member.role) !== 'admin') return false;
+  return tableRows_('members').filter(function (row) {
+    return normalizeRole_(row.role) === 'admin';
+  }).length <= 1;
+}
+
+function deleteInactiveMember_(member) {
+  tableRows_('devices').filter(function (row) {
+    return sameName_(row.username, member.username);
+  }).sort(function (a, b) { return b.__row - a.__row; }).forEach(function (row) {
+    table_('devices').deleteRow(row.__row);
+  });
+  table_('members').deleteRow(member.__row);
+  Security.bumpTokenVersion(member.username);
+}
+
+function sendInactivityNotice_(email, inactiveMonths) {
+  const recipient = String(email || '').trim();
+  if (!recipient) {
+    console.error('[Inactivity maintenance] 가입 이메일이 없어 알림을 보내지 못했어요.');
+    return false;
+  }
+  const isDeletionNotice = inactiveMonths >= 5;
+  const subject = isDeletionNotice
+    ? '[과학구리] 1개월 내 계정 삭제 예정 안내'
+    : '[과학구리] 장기 미접속 계정 안내';
+  const body = isDeletionNotice
+    ? '5개월 이상 로그인하지 않아 계정 삭제 예정임을 안내드립니다. 마지막 로그인일로부터 6개월이 되는 시점에 계정이 삭제됩니다. 계정을 유지하려면 그 전에 로그인해주세요.'
+    : '3개월 이상 로그인하지 않아 장기 미접속 계정임을 안내드립니다. 마지막 로그인일로부터 6개월 동안 로그인하지 않으면 계정이 삭제됩니다. 계정을 계속 이용하려면 로그인해주세요.';
+  try {
+    MailApp.sendEmail({
+      to: recipient,
+      name: '과학구리',
+      subject: subject,
+      body: body,
+      htmlBody: '<div style="font-family:sans-serif"><p>' + body + '</p></div>'
+    });
+    return true;
+  } catch (error) {
+    console.error('[Inactivity maintenance] 이메일 발송 실패: ' +
+      (error && error.message ? error.message : error));
+    return false;
+  }
 }
 
 function authorizeBackend() {
@@ -551,6 +682,22 @@ function nowIso_() {
   return new Date().toISOString();
 }
 
+function parseInactivityDate_(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? new Date(value.getTime()) : new Date(value);
+  return isFinite(date.getTime()) ? date : null;
+}
+
+function addCalendarMonths_(date, months) {
+  const result = new Date(date.getTime());
+  const day = result.getUTCDate();
+  result.setUTCDate(1);
+  result.setUTCMonth(result.getUTCMonth() + months);
+  const lastDay = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate();
+  result.setUTCDate(Math.min(day, lastDay));
+  return result;
+}
+
 function newId_() {
   return Utilities.getUuid();
 }
@@ -568,8 +715,9 @@ function withWriteLock_(callback) {
 function passwordHash_(password, salt) {
   const pepper = passwordPepper_();
   const value = 'gwakuri-password-v2\u0000' + String(salt) + '\u0000' + String(password);
+  const pepperBytes = Utilities.newBlob(pepper).getBytes();
   return PASSWORD_HASH_PREFIX + Utilities.base64Encode(
-    Utilities.computeHmacSha256Signature(Utilities.newBlob(value).getBytes(), pepper)
+    Utilities.computeHmacSha256Signature(Utilities.newBlob(value).getBytes(), pepperBytes)
   );
 }
 
@@ -681,27 +829,31 @@ function actionLogin_(p) {
   }
   if (!validPassword) throw new Error('아이디 또는 비밀번호를 확인해주세요.');
 
-  if (member.passwordHash.indexOf(PASSWORD_HASH_PREFIX) !== 0 || member.legacyPassword) {
-    const salt = Utilities.getUuid() + Utilities.getUuid();
-    const hash = passwordHash_(password, salt);
-    withWriteLock_(function () {
-      const latest = findMember_(username);
-      if (!latest || String(latest.passwordHash || '') !== member.passwordHash ||
-          legacyPasswordValue_(latest) !== member.legacyPassword) {
-        throw new Error('계정 정보가 변경되었어요. 다시 로그인해주세요.');
-      }
-      const sheet = table_('members');
-      setByHeader_(sheet, latest.__row, 'passwordSalt', salt);
-      setByHeader_(sheet, latest.__row, 'passwordHash', hash);
+  const shouldUpgradePassword = member.passwordHash.indexOf(PASSWORD_HASH_PREFIX) !== 0 || member.legacyPassword;
+  const upgradedSalt = shouldUpgradePassword ? Utilities.getUuid() + Utilities.getUuid() : '';
+  const upgradedHash = shouldUpgradePassword ? passwordHash_(password, upgradedSalt) : '';
+  return withWriteLock_(function () {
+    const latest = findMember_(username);
+    if (!latest || String(latest.passwordHash || '') !== member.passwordHash ||
+        legacyPasswordValue_(latest) !== member.legacyPassword) {
+      throw new Error('계정 정보가 변경되었어요. 다시 로그인해주세요.');
+    }
+    const sheet = table_('members');
+    if (shouldUpgradePassword) {
+      setByHeader_(sheet, latest.__row, 'passwordSalt', upgradedSalt);
+      setByHeader_(sheet, latest.__row, 'passwordHash', upgradedHash);
       clearLegacyPassword_(sheet, latest.__row);
-    });
-  }
-  return {
-    success: true,
-    username: member.username,
-    role: member.role,
-    muted: member.muted
-  };
+    }
+    setByHeader_(sheet, latest.__row, 'lastLoginAt', nowIso_());
+    setByHeader_(sheet, latest.__row, 'inactivity3MonthNoticeAt', '');
+    setByHeader_(sheet, latest.__row, 'inactivity5MonthNoticeAt', '');
+    return {
+      success: true,
+      username: String(latest.username || ''),
+      role: normalizeRole_(latest.role),
+      muted: truthy_(latest.muted)
+    };
+  });
 }
 
 function actionChangePassword_(p) {
