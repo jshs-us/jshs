@@ -225,6 +225,7 @@ fetch(URL)
 // 🥚 이스터에그: 요일 맞추기 — 🗓 아이콘을 3초 안에 3번 탭하면 시작
 // ============================================================
 (function () {
+  if (!window.GwakuriRuntime || !window.GwakuriRuntime.isNativeApp) return;
   const NEEDED = 3, TAP_WINDOW = 3000, ROUNDS = 8;
   let tapCount = 0, resetTimer = null;
 

@@ -3,31 +3,39 @@ const APP_DB_SPREADSHEET_ID = '1YKZiIhG2btyLzf49e10yl3HjpDhNi-wtZ2b1kSC9G4c';
 const APP_TABLES = {
   members: {
     name: '회원',
-    headers: ['이름', '권한', '작성금지', '이메일', '비밀번호솔트', '비밀번호해시', '가입일', '최초관리자']
+    headers: ['username', 'password', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder'],
+    appendMissing: true
   },
   posts: {
-    name: '앱_게시글',
-    headers: ['id', 'title', 'content', 'author', 'createdAt', 'fileUrl', 'fileName', 'likes', 'views', 'deleted']
+    name: '게시글',
+    headers: ['id', 'title', 'content', 'author', 'createdAt', 'likes', 'views', 'fileUrl', 'fileName', 'deleted'],
+    appendMissing: true
   },
   comments: {
-    name: '앱_댓글',
-    headers: ['id', 'postId', 'author', 'content', 'createdAt', 'deleted']
+    name: '댓글',
+    headers: ['id', 'postId', 'author', 'content', 'createdAt', 'deleted'],
+    appendMissing: true
   },
   likes: {
-    name: '앱_좋아요',
+    name: '좋아요',
     headers: ['postId', 'username', 'createdAt']
   },
   fines: {
-    name: '앱_벌금',
-    headers: ['id', 'student', 'amount', 'reason', 'createdBy', 'createdAt', 'status', 'proofUrl', 'updatedAt', 'updatedBy']
+    name: '벌금',
+    headers: ['ID', '학생', '사유', '금액', '상태', '부과자', '부과일시', '인증사진URL', '처리일시'],
+    columns: {
+      id: 'ID', student: '학생', reason: '사유', amount: '금액', status: '상태',
+      createdBy: '부과자', createdAt: '부과일시', proofUrl: '인증사진URL', updatedAt: '처리일시'
+    }
   },
   devices: {
-    name: '앱_기기토큰',
-    headers: ['username', 'token', 'platform', 'createdAt', 'updatedAt']
+    name: '기기토큰',
+    headers: ['username', 'token', 'platform', 'updatedAt']
   },
   eggs: {
-    name: '앱_이스터에그',
-    headers: ['username', 'eggId', 'name', 'score', 'found', 'updatedAt']
+    name: '이스터에그기록',
+    headers: ['username', 'eggId', 'best', 'updatedAt'],
+    columns: { username: 'username', eggId: 'eggId', score: 'best', updatedAt: 'updatedAt' }
   }
 };
 
@@ -93,7 +101,27 @@ function setupBackend() {
   Object.keys(APP_TABLES).forEach(function (key) {
     table_(key);
   });
-  return '초기화 완료: ' + ss.getName();
+  const migrated = withWriteLock_(function () {
+    return {
+      members: migrateLegacyMemberFields_(),
+      posts: migrateLegacyRows_('앱_게시글', 'posts', function (row) { return row; }, function (row) { return String(row.id || ''); }),
+      comments: migrateLegacyRows_('앱_댓글', 'comments', function (row) { return row; }, function (row) { return String(row.id || ''); }),
+      fines: migrateLegacyRows_('앱_벌금', 'fines', function (row) {
+        return {
+          id: row.id, student: row.student, reason: row.reason, amount: row.amount,
+          status: row.status, createdBy: row.createdBy, createdAt: row.createdAt,
+          proofUrl: row.proofUrl, updatedAt: row.updatedAt || row.createdAt
+        };
+      }, function (row) { return String(row.id || ''); }),
+      devices: migrateLegacyRows_('앱_기기토큰', 'devices', function (row) {
+        return { username: row.username, token: row.token, platform: row.platform, updatedAt: row.updatedAt };
+      }, function (row) { return String(row.token || ''); }),
+      eggs: migrateLegacyEggs_()
+    };
+  });
+  return '초기화 및 기존 데이터 연결 완료: ' + ss.getName() +
+    ' (회원 값 ' + migrated.members + '개, 게시글 ' + migrated.posts + ', 댓글 ' + migrated.comments + ', 벌금 ' + migrated.fines +
+    ', 기기 토큰 ' + migrated.devices + ', 이스터에그 ' + migrated.eggs + '건 이관)';
 }
 
 function authorizeBackend() {
@@ -110,14 +138,14 @@ function bootstrapFounder() {
   try {
     const sheet = table_('members');
     const rows = tableRows_('members');
-    if (rows.some(function (row) { return truthy_(row['최초관리자']); })) {
+    if (rows.some(function (row) { return truthy_(row.isFounder); })) {
       throw new Error('최초 관리자가 이미 지정되어 있어요.');
     }
-    const member = rows.find(function (row) { return sameName_(row['이름'], username); });
+    const member = rows.find(function (row) { return sameName_(row.username, username); });
     if (!member) throw new Error('먼저 해당 계정으로 회원가입한 뒤 다시 실행하세요.');
     const rowIndex = member.__row;
-    setByHeader_(sheet, rowIndex, '권한', 'admin');
-    setByHeader_(sheet, rowIndex, '최초관리자', true);
+    setByHeader_(sheet, rowIndex, 'role', 'admin');
+    setByHeader_(sheet, rowIndex, 'isFounder', true);
     PropertiesService.getScriptProperties().deleteProperty('BOOTSTRAP_ADMIN_USERNAME');
     return '최초 관리자 지정 완료: ' + username;
   } finally {
@@ -137,8 +165,9 @@ function resetMemberPasswordFromEditor() {
   withWriteLock_(function () {
     const member = findMember_(username);
     if (!member) throw new Error('회원을 찾을 수 없어요: ' + username);
-    setByHeader_(table_('members'), member.__row, '비밀번호솔트', salt);
-    setByHeader_(table_('members'), member.__row, '비밀번호해시', hash);
+    setByHeader_(table_('members'), member.__row, 'passwordSalt', salt);
+    setByHeader_(table_('members'), member.__row, 'passwordHash', hash);
+    setByHeader_(table_('members'), member.__row, 'password', '');
   });
   Security.bumpTokenVersion(username);
   props.deleteProperty('RESET_MEMBER_USERNAME');
@@ -166,7 +195,7 @@ function table_(key) {
   }
   const current = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0]
     .map(function (value) { return String(value).trim(); });
-  if (key === 'members') {
+  if (spec.appendMissing) {
     spec.headers.forEach(function (header) {
       if (current.indexOf(header) < 0) {
         const col = sheet.getLastColumn() + 1;
@@ -185,14 +214,22 @@ function table_(key) {
 }
 
 function tableRows_(key) {
+  const spec = APP_TABLES[key];
   const sheet = table_(key);
   const lastRow = sheet.getLastRow();
   const lastCol = sheet.getLastColumn();
   if (lastRow < 2 || lastCol < 1) return [];
-  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(String);
+  const headers = sheet.getRange(1, 1, 1, lastCol).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
   return sheet.getRange(2, 1, lastRow - 1, lastCol).getValues().map(function (cells, index) {
     const item = { __row: index + 2 };
-    headers.forEach(function (header, col) { item[header] = cells[col]; });
+    headers.forEach(function (header, col) {
+      const canonical = Object.keys(spec.columns || {}).find(function (field) {
+        return spec.columns[field] === header;
+      }) || header;
+      item[canonical] = cells[col];
+    });
     return item;
   }).filter(function (item) {
     return Object.keys(item).some(function (key) { return key !== '__row' && item[key] !== '' && item[key] != null; });
@@ -223,10 +260,123 @@ function appendRow_(sheet, values) {
   writeRow_(sheet, sheet.getLastRow() + 1, values);
 }
 
+function appendRecord_(key, record) {
+  const spec = APP_TABLES[key];
+  const sheet = table_(key);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  const values = headers.map(function (header) {
+    const canonical = Object.keys(spec.columns || {}).find(function (field) {
+      return spec.columns[field] === header;
+    }) || header;
+    return record[canonical] == null ? '' : record[canonical];
+  });
+  appendRow_(sheet, values);
+}
+
+function rawRowsFromSheet_(sheetName) {
+  const sheet = database_().getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  return sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues().map(function (cells) {
+    const row = {};
+    headers.forEach(function (header, col) { row[header] = cells[col]; });
+    return row;
+  }).filter(function (row) {
+    return Object.keys(row).some(function (key) { return row[key] !== '' && row[key] != null; });
+  });
+}
+
+function migrateLegacyMemberFields_() {
+  const sheet = table_('members');
+  const legacyFields = {
+    username: '이름', password: '비밀번호', createdAt: '가입일', role: '권한', muted: '작성금지',
+    email: '이메일', passwordSalt: '비밀번호솔트', passwordHash: '비밀번호해시', isFounder: '최초관리자'
+  };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  const rows = sheet.getLastRow() < 2 ? [] : sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).getValues();
+  const usernameCol = headers.indexOf('username');
+  let migrated = 0;
+  rows.forEach(function (cells, index) {
+    if (usernameCol < 0 || cells[usernameCol] !== '' && cells[usernameCol] != null) return;
+    Object.keys(legacyFields).forEach(function (field) {
+      const currentCol = headers.indexOf(field);
+      const legacyCol = headers.indexOf(legacyFields[field]);
+      if (currentCol < 0 || legacyCol < 0 || cells[currentCol] !== '' && cells[currentCol] != null) return;
+      const value = cells[legacyCol];
+      if (value === '' || value == null) return;
+      setByHeader_(sheet, index + 2, field, value);
+      migrated++;
+    });
+  });
+  return migrated;
+}
+
+function migrateLegacyRows_(sourceName, targetKey, transform, identityFor) {
+  if (sourceName === APP_TABLES[targetKey].name) return 0;
+  const existing = tableRows_(targetKey);
+  const known = {};
+  existing.forEach(function (row) {
+    const identity = identityFor(row);
+    if (identity) known[identity] = true;
+  });
+  let migrated = 0;
+  rawRowsFromSheet_(sourceName).forEach(function (source) {
+    const record = transform(source);
+    const identity = identityFor(record);
+    if (!identity || known[identity]) return;
+    appendRecord_(targetKey, record);
+    known[identity] = true;
+    migrated++;
+  });
+  return migrated;
+}
+
+function migrateLegacyEggs_() {
+  const existing = tableRows_('eggs');
+  const byIdentity = {};
+  existing.forEach(function (row) {
+    byIdentity[String(row.username).toLowerCase() + ':' + String(row.eggId)] = row;
+  });
+  let migrated = 0;
+  rawRowsFromSheet_('앱_이스터에그').forEach(function (source) {
+    const username = String(source.username || '').trim();
+    const eggId = String(source.eggId || '').trim();
+    if (!username || !eggId) return;
+    const identity = username.toLowerCase() + ':' + eggId;
+    const score = Math.max(0, Number(source.score) || 0);
+    const current = byIdentity[identity];
+    if (!current) {
+      const record = { username: username, eggId: eggId, score: score, updatedAt: source.updatedAt || nowIso_() };
+      appendRecord_('eggs', record);
+      record.__row = table_('eggs').getLastRow();
+      byIdentity[identity] = record;
+      migrated++;
+    } else if (score > Number(current.score || 0)) {
+      const sheet = table_('eggs');
+      setByHeader_(sheet, current.__row, 'score', score);
+      setByHeader_(sheet, current.__row, 'updatedAt', source.updatedAt || nowIso_());
+      current.score = score;
+      migrated++;
+    }
+  });
+  return migrated;
+}
+
 function setByHeader_(sheet, rowIndex, header, value) {
-  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
-  const col = headers.indexOf(header);
-  if (col < 0) throw new Error('필요한 열을 찾을 수 없어요: ' + header);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0].map(function (value) {
+    return String(value).trim();
+  });
+  const spec = Object.keys(APP_TABLES).map(function (key) { return APP_TABLES[key]; })
+    .find(function (item) { return item.name === sheet.getName(); });
+  const physicalHeader = spec && spec.columns && spec.columns[header] || header;
+  const col = headers.indexOf(physicalHeader);
+  if (col < 0) throw new Error('필요한 열을 찾을 수 없어요: ' + physicalHeader);
   const cell = sheet.getRange(rowIndex, col + 1);
   cell.setNumberFormat('@');
   cell.setValue(value);
@@ -235,14 +385,14 @@ function setByHeader_(sheet, rowIndex, header, value) {
 function findMember_(username) {
   const target = String(username || '').trim().toLowerCase();
   return tableRows_('members').find(function (row) {
-    return String(row['이름'] || '').trim().toLowerCase() === target;
+    return String(row.username || '').trim().toLowerCase() === target;
   }) || null;
 }
 
 function findMemberByEmail_(email) {
   const target = String(email || '').trim().toLowerCase();
   return tableRows_('members').find(function (row) {
-    return String(row['이메일'] || '').trim().toLowerCase() === target;
+    return String(row.email || '').trim().toLowerCase() === target;
   }) || null;
 }
 
@@ -250,13 +400,14 @@ function memberForSecurity_(username) {
   const row = findMember_(username);
   if (!row) return null;
   return {
-    username: String(row['이름'] || '').trim(),
-    role: normalizeRole_(row['권한']),
-    muted: truthy_(row['작성금지']),
-    email: String(row['이메일'] || '').trim(),
-    isFounder: truthy_(row['최초관리자']),
-    salt: String(row['비밀번호솔트'] || ''),
-    passwordHash: String(row['비밀번호해시'] || ''),
+    username: String(row.username || '').trim(),
+    role: normalizeRole_(row.role),
+    muted: truthy_(row.muted),
+    email: String(row.email || '').trim(),
+    isFounder: truthy_(row.isFounder),
+    salt: String(row.passwordSalt || ''),
+    passwordHash: String(row.passwordHash || ''),
+    legacyPassword: String(row.password || ''),
     row: row.__row
   };
 }
@@ -265,15 +416,15 @@ function emailInUse_(email, exceptUsername) {
   const target = String(email || '').trim().toLowerCase();
   const except = String(exceptUsername || '').trim().toLowerCase();
   return tableRows_('members').some(function (row) {
-    return String(row['이메일'] || '').trim().toLowerCase() === target &&
-      String(row['이름'] || '').trim().toLowerCase() !== except;
+    return String(row.email || '').trim().toLowerCase() === target &&
+      String(row.username || '').trim().toLowerCase() !== except;
   });
 }
 
 function setMemberEmail_(username, email) {
   const member = findMember_(username);
   if (!member) return false;
-  setByHeader_(table_('members'), member.__row, '이메일', email);
+  setByHeader_(table_('members'), member.__row, 'email', email);
   return true;
 }
 
@@ -368,8 +519,8 @@ function actionSignup_(p) {
     const sheet = table_('members');
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     const values = {
-      '이름': username, '권한': 'user', '작성금지': false, '이메일': email,
-      '비밀번호솔트': salt, '비밀번호해시': hash, '가입일': nowIso_(), '최초관리자': false
+      username: username, password: '', role: 'user', muted: false, email: email,
+      passwordSalt: salt, passwordHash: hash, createdAt: nowIso_(), isFounder: false
     };
     appendRow_(sheet, headers.map(function (header) { return values[header] == null ? '' : values[header]; }));
     return { success: true, message: '가입되었습니다. 로그인해주세요.' };
@@ -386,7 +537,19 @@ function actionLogin_(p) {
     throw new Error('이름 또는 비밀번호를 확인해주세요.');
   }
   if (!passwordMatches_(password, member.salt, member.passwordHash)) {
-    throw new Error('이름 또는 비밀번호를 확인해주세요.');
+    if (!member.legacyPassword || member.legacyPassword !== password) {
+      throw new Error('이름 또는 비밀번호를 확인해주세요.');
+    }
+    const salt = Utilities.getUuid() + Utilities.getUuid();
+    const hash = passwordHash_(password, salt);
+    withWriteLock_(function () {
+      const latest = findMember_(username);
+      if (!latest || latest.password !== password) throw new Error('계정 정보가 변경되었어요. 다시 로그인해주세요.');
+      const sheet = table_('members');
+      setByHeader_(sheet, latest.__row, 'passwordSalt', salt);
+      setByHeader_(sheet, latest.__row, 'passwordHash', hash);
+      setByHeader_(sheet, latest.__row, 'password', '');
+    });
   }
   return {
     success: true,
@@ -411,12 +574,13 @@ function actionChangePassword_(p) {
   const hash = passwordHash_(newPassword, salt);
   withWriteLock_(function () {
     const latest = findMember_(username);
-    if (!latest || !passwordMatches_(oldPassword, latest['비밀번호솔트'], latest['비밀번호해시'])) {
+    if (!latest || !passwordMatches_(oldPassword, latest.passwordSalt, latest.passwordHash)) {
       throw new Error('현재 비밀번호가 변경되었어요. 다시 로그인해주세요.');
     }
     const sheet = table_('members');
-    setByHeader_(sheet, latest.__row, '비밀번호솔트', salt);
-    setByHeader_(sheet, latest.__row, '비밀번호해시', hash);
+    setByHeader_(sheet, latest.__row, 'passwordSalt', salt);
+    setByHeader_(sheet, latest.__row, 'passwordHash', hash);
+    setByHeader_(sheet, latest.__row, 'password', '');
   });
   return { success: true, message: '비밀번호를 변경했어요.' };
 }
@@ -425,17 +589,17 @@ function actionGetMyInfo_(p) {
   const member = findMember_(p.username);
   if (!member) throw new Error('회원 정보를 찾을 수 없어요.');
   const posts = tableRows_('posts').filter(function (row) {
-    return !truthy_(row.deleted) && sameName_(row.author, member['이름']);
+    return !truthy_(row.deleted) && sameName_(row.author, member.username);
   }).length;
   const comments = tableRows_('comments').filter(function (row) {
-    return !truthy_(row.deleted) && sameName_(row.author, member['이름']);
+    return !truthy_(row.deleted) && sameName_(row.author, member.username);
   }).length;
   return {
     success: true,
-    username: String(member['이름']),
-    role: normalizeRole_(member['권한']),
-    muted: truthy_(member['작성금지']),
-    email: String(member['이메일'] || ''),
+    username: String(member.username),
+    role: normalizeRole_(member.role),
+    muted: truthy_(member.muted),
+    email: String(member.email || ''),
     postCount: posts,
     commentCount: comments
   };
@@ -520,8 +684,7 @@ function actionCreatePost_(p) {
     createdAt: nowIso_(), fileUrl: fileUrl, fileName: fileName, likes: 0, views: 0, deleted: false
   };
   withWriteLock_(function () {
-    const sheet = table_('posts');
-    appendRow_(sheet, APP_TABLES.posts.headers.map(function (header) { return post[header]; }));
+    appendRecord_('posts', post);
   });
   return { success: true, post: postObject_(post) };
 }
@@ -584,7 +747,7 @@ function actionAddComment_(p) {
       id: newId_(), postId: postId, author: requiredText_(p.author, '작성자', 30),
       content: content, createdAt: nowIso_(), deleted: false
     };
-    appendRow_(table_('comments'), APP_TABLES.comments.headers.map(function (header) { return comment[header]; }));
+    appendRecord_('comments', comment);
     return { success: true, comment: comment };
   });
 }
@@ -610,11 +773,11 @@ function actionListUsers_() {
     success: true,
     users: tableRows_('members').map(function (row) {
       return {
-        username: String(row['이름'] || ''),
-        role: normalizeRole_(row['권한']),
-        muted: truthy_(row['작성금지']),
-        createdAt: row['가입일'] || '',
-        isFounder: truthy_(row['최초관리자'])
+        username: String(row.username || ''),
+        role: normalizeRole_(row.role),
+        muted: truthy_(row.muted),
+        createdAt: row.createdAt || '',
+        isFounder: truthy_(row.isFounder)
       };
     }).sort(function (a, b) { return a.username.localeCompare(b.username); })
   };
@@ -622,8 +785,8 @@ function actionListUsers_() {
 
 function ensureNotProtectedMember_(member, actor) {
   if (!member) throw new Error('회원을 찾을 수 없어요.');
-  if (truthy_(member['최초관리자'])) throw new Error('최초 관리자는 이 기능으로 변경할 수 없어요.');
-  if (sameName_(member['이름'], actor)) throw new Error('현재 로그인한 계정에는 이 작업을 할 수 없어요.');
+  if (truthy_(member.isFounder)) throw new Error('최초 관리자는 이 기능으로 변경할 수 없어요.');
+  if (sameName_(member.username, actor)) throw new Error('현재 로그인한 계정에는 이 작업을 할 수 없어요.');
 }
 
 function actionSetRole_(p) {
@@ -633,11 +796,11 @@ function actionSetRole_(p) {
   return withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);
-    if (normalizeRole_(member['권한']) === 'admin' && role !== 'admin' &&
-      tableRows_('members').filter(function (row) { return normalizeRole_(row['권한']) === 'admin'; }).length <= 1) {
+    if (normalizeRole_(member.role) === 'admin' && role !== 'admin' &&
+      tableRows_('members').filter(function (row) { return normalizeRole_(row.role) === 'admin'; }).length <= 1) {
       throw new Error('마지막 관리자의 권한은 해제할 수 없어요.');
     }
-    setByHeader_(table_('members'), member.__row, '권한', role);
+    setByHeader_(table_('members'), member.__row, 'role', role);
     return { success: true };
   });
 }
@@ -647,7 +810,7 @@ function actionSetMuted_(p) {
   return withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);
-    setByHeader_(table_('members'), member.__row, '작성금지', truthy_(p.muted));
+    setByHeader_(table_('members'), member.__row, 'muted', truthy_(p.muted));
     return { success: true };
   });
 }
@@ -660,8 +823,9 @@ function actionResetPassword_(p) {
   withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);
-    setByHeader_(table_('members'), member.__row, '비밀번호솔트', salt);
-    setByHeader_(table_('members'), member.__row, '비밀번호해시', hash);
+    setByHeader_(table_('members'), member.__row, 'passwordSalt', salt);
+    setByHeader_(table_('members'), member.__row, 'passwordHash', hash);
+    setByHeader_(table_('members'), member.__row, 'password', '');
   });
   return { success: true, message: '임시 비밀번호: ' + temporaryPassword + ' (로그인 후 즉시 변경해주세요.)' };
 }
@@ -671,12 +835,12 @@ function actionKickUser_(p) {
   return withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);
-    if (normalizeRole_(member['권한']) === 'admin' &&
-      tableRows_('members').filter(function (row) { return normalizeRole_(row['권한']) === 'admin'; }).length <= 1) {
+    if (normalizeRole_(member.role) === 'admin' &&
+      tableRows_('members').filter(function (row) { return normalizeRole_(row.role) === 'admin'; }).length <= 1) {
       throw new Error('마지막 관리자는 탈퇴 처리할 수 없어요.');
     }
     tableRows_('devices').filter(function (row) {
-      return sameName_(row.username, member['이름']);
+      return sameName_(row.username, member.username);
     }).sort(function (a, b) { return b.__row - a.__row; }).forEach(function (row) {
       table_('devices').deleteRow(row.__row);
     });
@@ -724,10 +888,10 @@ function actionFineCreate_(p) {
   const fine = {
     id: newId_(), student: student, amount: amount, reason: reason,
     createdBy: requiredText_(p.actor, '부과자', 30), createdAt: nowIso_(),
-    status: '미납', proofUrl: '', updatedAt: nowIso_(), updatedBy: requiredText_(p.actor, '부과자', 30)
+    status: '미납', proofUrl: '', updatedAt: nowIso_()
   };
   withWriteLock_(function () {
-    appendRow_(table_('fines'), APP_TABLES.fines.headers.map(function (header) { return fine[header]; }));
+    appendRecord_('fines', fine);
   });
   return { success: true, fine: fineObject_(fine) };
 }
@@ -747,7 +911,6 @@ function actionFineSubmitProof_(p) {
     setByHeader_(sheet, fine.__row, 'proofUrl', url);
     setByHeader_(sheet, fine.__row, 'status', '확인대기');
     setByHeader_(sheet, fine.__row, 'updatedAt', nowIso_());
-    setByHeader_(sheet, fine.__row, 'updatedBy', p.actor);
     return { success: true };
   });
 }
@@ -762,7 +925,6 @@ function actionFineUpdateStatus_(p) {
     if (!fine) throw new Error('벌금 내역을 찾을 수 없어요.');
     setByHeader_(sheet, fine.__row, 'status', status);
     setByHeader_(sheet, fine.__row, 'updatedAt', nowIso_());
-    setByHeader_(sheet, fine.__row, 'updatedBy', p.actor);
     return { success: true };
   });
 }
@@ -781,7 +943,7 @@ function actionRegisterDeviceToken_(p) {
       setByHeader_(sheet, existing.__row, 'platform', platform);
       setByHeader_(sheet, existing.__row, 'updatedAt', nowIso_());
     } else {
-      appendRow_(sheet, [p.actor, token, platform, nowIso_(), nowIso_()]);
+      appendRecord_('devices', { username: p.actor, token: token, platform: platform, updatedAt: nowIso_() });
     }
     return { success: true };
   });
@@ -802,9 +964,12 @@ function actionEggSubmitScore_(p) {
     const rows = tableRows_('eggs');
     const existing = rows.find(function (row) { return sameName_(row.username, p.username) && String(row.eggId) === eggId; });
     const best = Math.max(Number(existing && existing.score || 0), score);
-    const values = [p.username, eggId, EGG_NAMES[eggId], best, best > 0, nowIso_()];
-    if (existing) writeRow_(sheet, existing.__row, values);
-    else appendRow_(sheet, values);
+    if (existing) {
+      setByHeader_(sheet, existing.__row, 'score', best);
+      setByHeader_(sheet, existing.__row, 'updatedAt', nowIso_());
+    } else {
+      appendRecord_('eggs', { username: p.username, eggId: eggId, score: best, updatedAt: nowIso_() });
+    }
     return { success: true, score: best };
   });
 }
@@ -818,7 +983,7 @@ function actionEggMyProgress_(p) {
       return {
         id: eggId,
         name: EGG_NAMES[eggId],
-        found: !!row && truthy_(row.found),
+        found: !!row,
         score: Number(row && row.score || 0)
       };
     })

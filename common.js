@@ -173,6 +173,8 @@ body{
   // 앱(Capacitor 네이티브)에서는 완전히 껐다 켜도 로그인이 유지되도록 localStorage를 쓰고,
   // 웹사이트(브라우저)에서는 기존처럼 탭/창을 닫으면 로그아웃되도록 sessionStorage를 씁니다.
   const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  window.GwakuriRuntime = window.GwakuriRuntime || {};
+  window.GwakuriRuntime.isNativeApp = isNativeApp;
   const sessionStore = isNativeApp ? window.localStorage : window.sessionStorage;
 
   // 로그인 후에는 모든 요청에 로그인 토큰(authToken)이 자동으로 붙어요.
@@ -496,6 +498,7 @@ body{
 // "나의 이스터에그" 화면이 열립니다 (한 번 찾으면 계속 버튼이 보여요).
 // ============================================================
 (function () {
+  if (!window.GwakuriRuntime || !window.GwakuriRuntime.isNativeApp) return;
   const HUB_UNLOCK_KEY = 'bw_egg_hub_unlocked';
 
   const session = (window.GwakuriAuth && window.GwakuriAuth.getSession) ? window.GwakuriAuth.getSession() : null;
