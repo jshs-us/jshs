@@ -639,8 +639,8 @@ function randomPassword_() {
 }
 
 function actionSignup_(p) {
-  const username = requiredText_(p.username, '이름', 30);
-  if (!/^[가-힣A-Za-z0-9._ -]{2,30}$/.test(username)) throw new Error('이름은 한글, 영문, 숫자, 공백, ., _, -만 사용할 수 있어요.');
+  const username = requiredText_(p.username, '아이디', 30);
+  if (!/^[가-힣A-Za-z0-9._ -]{2,30}$/.test(username)) throw new Error('아이디는 한글, 영문, 숫자, 공백, ., _, -만 사용할 수 있어요.');
   const password = String(p.password || '');
   if (password.length < PASSWORD_MIN_LENGTH || password.length > 128) {
     throw new Error('비밀번호는 8자 이상 128자 이하로 입력해주세요.');
@@ -650,7 +650,7 @@ function actionSignup_(p) {
   const salt = Utilities.getUuid() + Utilities.getUuid();
   const hash = passwordHash_(password, salt);
   return withWriteLock_(function () {
-    if (findMember_(username)) throw new Error('이미 사용 중인 이름이에요.');
+    if (findMember_(username)) throw new Error('이미 사용 중인 아이디예요.');
     if (emailInUse_(email, '')) throw new Error('이미 다른 계정에서 쓰는 이메일이에요.');
     if (!Security.consumeEmailProof(p.emailProof, email, 'signup', '')) {
       throw new Error('이메일 인증이 만료됐어요. 다시 인증해주세요.');
@@ -667,19 +667,19 @@ function actionSignup_(p) {
 }
 
 function actionLogin_(p) {
-  const username = requiredText_(p.username, '이름', 30);
+  const username = requiredText_(p.username, '아이디', 30);
   const password = String(p.password || '');
-  if (!password || password.length > 128) throw new Error('이름 또는 비밀번호를 확인해주세요.');
+  if (!password || password.length > 128) throw new Error('아이디 또는 비밀번호를 확인해주세요.');
   const member = memberForSecurity_(username);
   if (!member) {
     passwordHash_(password, 'invalid-user-salt');
-    throw new Error('이름 또는 비밀번호를 확인해주세요.');
+    throw new Error('아이디 또는 비밀번호를 확인해주세요.');
   }
   let validPassword = passwordMatches_(password, member.salt, member.passwordHash);
   if (!validPassword && member.legacyPassword && member.legacyPassword === password) {
     validPassword = true;
   }
-  if (!validPassword) throw new Error('이름 또는 비밀번호를 확인해주세요.');
+  if (!validPassword) throw new Error('아이디 또는 비밀번호를 확인해주세요.');
 
   if (member.passwordHash.indexOf(PASSWORD_HASH_PREFIX) !== 0 || member.legacyPassword) {
     const salt = Utilities.getUuid() + Utilities.getUuid();

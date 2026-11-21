@@ -299,7 +299,7 @@ body{
           <button type="button" class="bw-authtab active" data-m="login">로그인</button>
           <button type="button" class="bw-authtab" data-m="signup">회원가입</button>
         </div>
-        <input id="bw-au" type="text" placeholder="이름" autocomplete="username"/>
+        <input id="bw-au" type="text" maxlength="30" placeholder="아이디" autocomplete="username"/>
         <div class="bw-password-row">
           <input id="bw-ap" type="password" maxlength="128" placeholder="비밀번호" autocomplete="current-password"/>
           <button type="button" class="bw-password-toggle" id="bw-ap-toggle" aria-label="비밀번호 표시" aria-pressed="false">
@@ -408,7 +408,7 @@ body{
 
     async function submit(){
       const u = userEl.value.trim(), p = passEl.value;
-      if(!u || !p){ say('이름과 비밀번호를 모두 입력해주세요.', 'err'); return; }
+      if(!u || !p){ say('아이디와 비밀번호를 모두 입력해주세요.', 'err'); return; }
       if(mode==='signup' && p.length < 8){ say('비밀번호는 8자 이상 입력해주세요.', 'err'); return; }
       if(mode==='signup' && p !== passConfirmEl.value){ say('비밀번호가 서로 일치하지 않아요.', 'err'); return; }
       if(mode==='signup' && (!emailProof || emailEl.value.trim().toLowerCase() !== verifiedEmail)){

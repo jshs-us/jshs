@@ -142,7 +142,7 @@
         : '<span class="mp-badge mp-badge-user">일반</span>';
       const mb = r.muted ? '<span class="mp-badge mp-badge-muted">작성 금지됨</span>' : '';
       infoBox.innerHTML = `
-        <div class="mp-info-row"><span>이름</span><b>${escH(r.username)}</b></div>
+        <div class="mp-info-row"><span>아이디</span><b>${escH(r.username)}</b></div>
         <div class="mp-info-row"><span>이메일</span><b>${escH(r.email || '미등록')}</b></div>
         <div class="mp-info-row"><span>권한</span><span>${rb}${mb}</span></div>
         <div class="mp-info-row"><span>작성한 글</span><b>${r.postCount}개</b></div>
@@ -255,7 +255,7 @@
       const r = await window.GwakuriAuth.call('listUsers', { actor: session.username });
       if(!r.success){ b.innerHTML = `<div class="mp-empty">${escH(r.message || '불러오지 못했어요.')}</div>`; return; }
       b.innerHTML = `<table class="mp-table"><thead><tr>
-          <th>이름</th><th>가입일</th><th>권한</th><th>상태</th><th>관리</th>
+          <th>아이디</th><th>가입일</th><th>권한</th><th>상태</th><th>관리</th>
         </tr></thead><tbody>${r.users.map(u=>`
           <tr>
             <td>${escH(u.username)}${u.isFounder?' <span class="mp-badge mp-badge-admin">최초</span>':''}</td>
