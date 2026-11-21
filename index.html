@@ -273,11 +273,12 @@ fetch(HW_URL)
 
     const box = document.getElementById('hw-preview');
     if (!rows.length) { box.innerHTML = '<div class="bw-preview-empty">과제가 없어요.</div>'; return; }
+    function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
     box.innerHTML = rows.map(r => {
       const days = daysUntil(r.dueDate);
       const daysLabel = days === null ? '' : (days > 0 ? `${days}일 남음` : days === 0 ? 'D-DAY' : `${Math.abs(days)}일 지남`);
       return `<div class="bw-preview-row">
-        <span>${r.title}</span>
+        <span>${esc(r.title)}</span>
         <span class="sub">${daysLabel}</span>
       </div>`;
     }).join('');
@@ -397,9 +398,10 @@ fetch(CAL_URL)
 
     if (!list.length) { box.innerHTML = `<div class="bw-preview-empty">${curMonthNum}월에 등록된 일정이 없어요.</div>`; return; }
 
+    function esc(s){ const d=document.createElement('div'); d.textContent=String(s??''); return d.innerHTML; }
     box.innerHTML = list.map(it => `
       <div class="bw-preview-row">
-        <span>${it.event}</span>
+        <span>${esc(it.event)}</span>
         <span class="sub">${curMonthNum}/${it.date}</span>
       </div>`).join('');
   })

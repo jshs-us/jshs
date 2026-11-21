@@ -146,8 +146,6 @@
 (function(){
 const SCRIPT_URL=(window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
 // ── 사진/파일 업로드: Cloudinary ──────────────────
-const CLOUDINARY_CLOUD_NAME="cyu356na";
-const CLOUDINARY_UPLOAD_PRESET="gwakuri_board";
 const MAX_FILE_SIZE=50*1024*1024; // 1회 업로드 용량 상한(50MB). 실제 상한은 Cloudinary 계정 플랜(무료 플랜은 이미지/일반파일 10MB, 동영상 100MB)을 따름
 
 // ── 로그인 세션은 common.js(GwakuriAuth)에서 공유 ──────────────────
@@ -218,7 +216,7 @@ function renderFP(){
 }
 async function uploadCloudinary(file,onP){
   // 서명 업로드: 로그인 토큰이 있어야 서버가 업로드 서명을 내려줘요 (토큰 없으면 업로드 불가)
-  const sig=await window.GwakuriAuth.call("getUploadSignature",{});
+  const sig=await window.GwakuriAuth.call("getUploadSignature",{purpose:"board"});
   if(!sig||!sig.success)throw new Error((sig&&sig.message)||"업로드 권한을 확인하지 못했어요. 다시 로그인해주세요.");
   return new Promise((res,rej)=>{
     const fd=new FormData();
@@ -226,6 +224,8 @@ async function uploadCloudinary(file,onP){
     fd.append("api_key",sig.apiKey);
     fd.append("timestamp",sig.timestamp);
     fd.append("folder",sig.folder);
+    fd.append("public_id",sig.publicId);
+    fd.append("overwrite",String(sig.overwrite));
     fd.append("signature",sig.signature);
     const x=new XMLHttpRequest();
     x.open("POST",`https://api.cloudinary.com/v1_1/${sig.cloud}/auto/upload`,true);

@@ -288,7 +288,7 @@
       });
       b.querySelectorAll('[data-rst]').forEach(btn=>{
         btn.onclick = async ()=>{
-          if(!confirm(btn.dataset.rst + '님 비밀번호를 0000으로 초기화?')) return;
+          if(!confirm(btn.dataset.rst + '님의 임시 비밀번호를 새로 발급할까요?')) return;
           const r = await window.GwakuriAuth.call('resetPassword', { actor: session.username, targetUsername: btn.dataset.rst });
           alert(r.message || (r.success ? '완료' : '실패'));
         };

@@ -113,8 +113,6 @@
 <script>
 (function(){
 const SCRIPT_URL=(window.APP_CONFIG && window.APP_CONFIG.SCRIPT_URL) || "";
-const CLOUDINARY_CLOUD_NAME="acj4zb2u";
-const CLOUDINARY_UPLOAD_PRESET="jshsfine";
 const MAX_FILE_SIZE=15*1024*1024; // 인증사진 용량 상한(15MB)
 
 // 벌금 관리자 (요청자 이름 기준 — 실제 권한 검증은 서버(Apps Script)에서도 동일 목록으로 반드시 체크해야 함)
@@ -231,7 +229,7 @@ function bindStudent(){
       btn.disabled=true;
       msgEl.textContent="업로드 중...";msgEl.className="msg";
       try{
-        const up=await uploadCloudinary(file,p=>{msgEl.textContent=`업로드 중... ${p}%`;});
+        const up=await uploadCloudinary(file,p=>{msgEl.textContent=`업로드 중... ${p}%`;},id);
         const r=await call("fineSubmitProof",{actor:S.user,id,proofUrl:up.fileUrl});
         if(r.success){msgEl.textContent="제출 완료! 관리자 확인을 기다려주세요.";msgEl.className="msg ok";await load();}
         else{msgEl.textContent=r.message||"제출 실패";msgEl.className="msg err";btn.disabled=false;}
@@ -348,9 +346,9 @@ function openLightbox(url){
   document.body.appendChild(box);
 }
 
-async function uploadCloudinary(file,onP){
+async function uploadCloudinary(file,onP,fineId){
   // 서명 업로드: 로그인 토큰이 있어야 서버가 업로드 서명을 내려줘요 (토큰 없으면 업로드 불가)
-  const sig=await window.GwakuriAuth.call("getUploadSignature",{});
+  const sig=await window.GwakuriAuth.call("getUploadSignature",{purpose:"fine",id:fineId});
   if(!sig||!sig.success)throw new Error((sig&&sig.message)||"업로드 권한을 확인하지 못했어요. 다시 로그인해주세요.");
   return new Promise((res,rej)=>{
     const fd=new FormData();
@@ -358,9 +356,11 @@ async function uploadCloudinary(file,onP){
     fd.append("api_key",sig.apiKey);
     fd.append("timestamp",sig.timestamp);
     fd.append("folder",sig.folder);
+    fd.append("public_id",sig.publicId);
+    fd.append("overwrite",String(sig.overwrite));
     fd.append("signature",sig.signature);
     const x=new XMLHttpRequest();
-    x.open("POST",`https://api.cloudinary.com/v1_1/${sig.cloud}/auto/upload`,true);
+    x.open("POST",`https://api.cloudinary.com/v1_1/${sig.cloud}/image/upload`,true);
     x.upload.onprogress=e=>{if(e.lengthComputable&&onP)onP(Math.round(e.loaded/e.total*100));};
     x.onload=()=>{
       if(x.status>=200&&x.status<300){
