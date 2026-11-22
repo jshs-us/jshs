@@ -12,6 +12,7 @@ var Security = (function () {
       requestEmailCode: { limit: 3, windowSec: 600 },
       verifyEmailCode: { limit: 10, windowSec: 600 },
       getUploadSignature: { limit: 20, windowSec: 3600 },
+      updateStudentId: { limit: 5, windowSec: 60 },
       createPostDirect: { limit: 10, windowSec: 600 },
       addComment: { limit: 20, windowSec: 300 },
       sendDm: { limit: 30, windowSec: 60 },

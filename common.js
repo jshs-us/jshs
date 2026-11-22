@@ -73,7 +73,8 @@ body{
 .bw-nav-username{color:rgba(255,255,255,.75);font-size:13px;white-space:nowrap;}
 .bw-nav-username b{color:#fff;}
 .bw-nav-profile{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.45);border-radius:50%;overflow:hidden;background:rgba(255,255,255,.14);color:#fff;text-decoration:none;font-size:14px;font-weight:800;}
-.bw-nav-profile img{width:100%;height:100%;object-fit:cover;}
+.bw-nav-links a.bw-nav-profile{width:36px;height:36px;padding:0;flex:none;border-radius:50%;}
+.bw-nav-profile img{display:block;width:100%;height:100%;object-fit:cover;}
 .bw-nav-profile:hover{outline:2px solid rgba(255,236,0,.7);}
 .bw-nav-logout{
   background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.32);

@@ -27,6 +27,9 @@
 .mp-profile-hint{font-size:13px;color:var(--muted);margin-top:8px;}
 .mp-info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px;}
 .mp-info-row:last-child{border-bottom:none;}
+.mp-student-id-form{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;}
+.mp-student-id-form .mp-row{flex:1;min-width:220px;margin:0;}
+.mp-student-id-hint{font-size:12px;color:var(--muted);margin-top:8px;}
 .mp-info-row span:first-child{color:var(--muted);}
 .mp-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12.5px;font-weight:700;}
 .mp-badge-admin{background:#fde3e3;color:#b3432b;}
@@ -69,7 +72,7 @@
 <body>
 <div class="bw-page">
   <h1 class="bw-page-title">👤 마이페이지</h1>
-  <p class="bw-page-sub">내 계정 정보를 확인하고 비밀번호를 변경할 수 있어요.</p>
+  <p class="bw-page-sub">프로필과 학번을 관리하고 계정 정보를 확인할 수 있어요.</p>
 
   <div class="mp-panel">
     <p class="mp-panel-title">프로필 사진</p>
@@ -90,6 +93,18 @@
   <div class="mp-panel">
     <p class="mp-panel-title">내 정보</p>
     <div id="mp-info"><div class="mp-loading">불러오는 중...</div></div>
+  </div>
+
+  <div class="mp-panel" id="mp-student-id-panel" hidden>
+    <p class="mp-panel-title">학번 등록 / 변경</p>
+    <form id="mp-student-id-form">
+      <div class="mp-student-id-form">
+        <div class="mp-row"><input id="mp-student-id" type="text" inputmode="numeric" maxlength="11" pattern="[0-9]{4}-[1-3]-[1-4]-[0-9]{2}" placeholder="2026-1-2-03" required aria-label="학번"/></div>
+        <button class="mp-btn" id="mp-student-id-save" type="submit">학번 등록</button>
+      </div>
+      <p class="mp-student-id-hint">입학연도-학년-반-두 자리 번호 형식으로 입력하세요. 학번은 회원끼리 중복될 수 없습니다.</p>
+      <p class="mp-msg" id="mp-student-id-msg" aria-live="polite"></p>
+    </form>
   </div>
 
   <div class="mp-panel">
@@ -126,6 +141,11 @@
   }
 
   const infoBox = document.getElementById('mp-info');
+  const studentIdPanel = document.getElementById('mp-student-id-panel');
+  const studentIdForm = document.getElementById('mp-student-id-form');
+  const studentIdInput = document.getElementById('mp-student-id');
+  const studentIdSave = document.getElementById('mp-student-id-save');
+  const studentIdMsg = document.getElementById('mp-student-id-msg');
   const cpb = document.getElementById('mp-cpb');
   const cpm = document.getElementById('mp-cpm');
   const opEl = document.getElementById('mp-op');
@@ -249,6 +269,9 @@
       if(!r.success){ infoBox.innerHTML = '<div class="mp-empty">정보를 불러오지 못했어요.</div>'; return; }
       currentProfileImageUrl = r.profileImageUrl || '';
       setProfilePreview(currentProfileImageUrl);
+      studentIdPanel.hidden = r.role === 'teacher';
+      studentIdInput.value = r.studentId || '';
+      studentIdSave.textContent = r.studentId ? '학번 변경' : '학번 등록';
       const rb = r.role==='admin' ? '<span class="mp-badge mp-badge-admin">관리자</span>'
         : r.role==='manager' ? '<span class="mp-badge mp-badge-manager">매니저</span>'
         : r.role==='teacher' ? '<span class="mp-badge mp-badge-manager">선생님</span>'
@@ -265,6 +288,32 @@
       infoBox.innerHTML = '<div class="mp-empty">정보를 불러오지 못했어요.</div>';
     }
   }
+
+  studentIdForm.addEventListener('submit', async event=>{
+    event.preventDefault();
+    studentIdSave.disabled = true;
+    studentIdMsg.textContent = '학번을 저장하는 중...';
+    studentIdMsg.className = 'mp-msg';
+    try{
+      const result = await window.GwakuriAuth.call('updateStudentId', {
+        studentId: studentIdInput.value.trim()
+      });
+      if(!result.success) throw new Error(result.message || '학번을 저장하지 못했어요.');
+      studentIdInput.value = result.studentId;
+      studentIdSave.textContent = '학번 변경';
+      studentIdMsg.textContent = '학번을 저장했어요.';
+      studentIdMsg.className = 'mp-msg ok';
+      const currentSession = window.GwakuriAuth.getSession();
+      currentSession.studentId = result.studentId;
+      window.GwakuriAuth.setSession(currentSession);
+      await loadInfo();
+    }catch(error){
+      studentIdMsg.textContent = error.message || '학번을 저장하지 못했어요.';
+      studentIdMsg.className = 'mp-msg err';
+    }finally{
+      studentIdSave.disabled = false;
+    }
+  });
 
   cpb.addEventListener('click', async ()=>{
     const op = opEl.value, np = npEl.value;

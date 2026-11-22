@@ -78,6 +78,7 @@ function doPost_original(e) {
     updateEmail: actionUpdateEmail_,
     changePassword: actionChangePassword_,
     getMyInfo: actionGetMyInfo_,
+    updateStudentId: actionUpdateStudentId_,
     listSchoolStudents: actionListSchoolStudents_,
     listDmThreads: actionListDmThreads_,
     listDmConversation: actionListDmConversation_,
@@ -648,6 +649,10 @@ function findMemberByStudentId_(studentId) {
   }) || null;
 }
 
+function isValidStudentId_(studentId) {
+  return /^\d{4}-[1-3]-[1-4]-\d{2}$/.test(String(studentId || '').trim());
+}
+
 function memberForSecurity_(username) {
   const row = findMember_(username);
   if (!row) return null;
@@ -821,7 +826,7 @@ function actionSignup_(p) {
   const username = requiredText_(p.username, '아이디', 30);
   if (!/^[가-힣A-Za-z0-9._ -]{2,30}$/.test(username)) throw new Error('아이디는 한글, 영문, 숫자, 공백, ., _, -만 사용할 수 있어요.');
   const studentId = requiredText_(p.studentId, '학번', 11);
-  if (!/^\d{4}-[1-3]-[1-4]-\d{2}$/.test(studentId)) {
+  if (!isValidStudentId_(studentId)) {
     throw new Error('학번 형식은 2026-1-2-03처럼 입력해주세요. (1~3학년, 1~4반)');
   }
   const password = String(p.password || '');
@@ -941,6 +946,27 @@ function actionGetMyInfo_(p) {
     postCount: posts,
     commentCount: comments
   };
+}
+
+function actionUpdateStudentId_(p) {
+  const username = requiredText_(p.username, '회원', 30);
+  const studentId = requiredText_(p.studentId, '학번', 11);
+  if (!isValidStudentId_(studentId)) {
+    throw new Error('학번 형식은 2026-1-2-03처럼 입력해주세요. (1~3학년, 1~4반)');
+  }
+  return withWriteLock_(function () {
+    const member = findMember_(username);
+    if (!member) throw new Error('회원 정보를 찾을 수 없어요.');
+    if (normalizeRole_(member.role) === 'teacher') {
+      throw new Error('선생님 계정에는 학번을 등록할 수 없어요.');
+    }
+    const existing = findMemberByStudentId_(studentId);
+    if (existing && !sameName_(existing.username, member.username)) {
+      throw new Error('이미 등록된 학번이에요.');
+    }
+    setByHeader_(table_('members'), member.__row, 'studentId', studentId);
+    return { success: true, studentId: studentId };
+  });
 }
 
 function actionListSchoolStudents_() {
