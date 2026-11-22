@@ -166,7 +166,7 @@ function isImgUrl(url,name){const c=(name||url||"").toLowerCase();return/\.(png|
 
 function renderUserbar(){
   if(S.user){
-    const rl=S.role==="admin"?" · 관리자":S.role==="manager"?" · 매니저":"";
+    const rl=S.role==="admin"?" · 관리자":S.role==="manager"?" · 매니저":S.role==="teacher"?" · 선생님":"";
     userbar.innerHTML=`<div class="gb-who"><span><b>${escH(S.user)}</b>님${rl}</span><a class="btn-userbar" href="mypage.html">마이페이지</a></div>`;
   }else{
     userbar.innerHTML="";

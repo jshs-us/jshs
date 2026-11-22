@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<link rel="icon" href="favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192.png"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+<meta name="theme-color" content="#061442"/>
+<style>html{visibility:hidden}</style>
+<title>탐활서 — 과학구리</title>
+<style>
+.activity-toolbar{display:flex;justify-content:flex-end;margin-bottom:16px;}
+.activity-toolbar[hidden]{display:none;}
+.activity-form-panel,.activity-card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px;margin-bottom:16px;}
+.activity-form-panel[hidden]{display:none;}
+.activity-form-title{font-size:18px;font-weight:800;color:var(--navy2);margin:0 0 16px;}
+.activity-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.activity-field{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.activity-field.full{grid-column:1/-1;}
+.activity-field label,.activity-field-label{font-size:13px;font-weight:750;color:var(--navy2);}
+.activity-field input,.activity-field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff;color:var(--ink);font:inherit;}
+.activity-student-list{display:grid;gap:2px;max-height:220px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;padding:8px 12px;}
+.activity-student-option{display:flex;align-items:center;gap:8px;min-height:32px;font-size:14px;}
+.activity-student-option input{width:auto;}
+.activity-hint,.activity-status{font-size:12px;color:var(--muted);}
+.activity-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px;}
+.activity-form-actions button,.activity-toolbar button,.activity-actions button{border:0;border-radius:9px;padding:9px 14px;background:var(--navy);color:#fff;font:inherit;font-weight:700;cursor:pointer;}
+.activity-form-actions .activity-cancel{background:#eef1f8;color:var(--ink);}
+.activity-form-actions button:disabled,.activity-actions button:disabled{opacity:.55;cursor:default;}
+.activity-status{min-height:18px;margin:10px 0 0;}
+.activity-status.error{color:#c23b3b;}
+.activity-list{display:grid;gap:12px;}
+.activity-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;}
+.activity-title{margin:0;color:var(--navy2);font-size:17px;font-weight:850;}
+.activity-time{flex:none;padding:4px 9px;border-radius:20px;background:#eef1f8;color:var(--navy);font-size:12px;font-weight:750;}
+.activity-detail{margin:12px 0 0;display:grid;gap:7px;font-size:14px;}
+.activity-detail-row{display:flex;gap:8px;align-items:baseline;}
+.activity-detail-label{flex:none;color:var(--muted);font-size:12px;min-width:64px;}
+.activity-students{overflow-wrap:anywhere;}
+.activity-meta{margin-top:12px;color:var(--muted);font-size:12px;}
+.activity-actions{display:flex;gap:8px;margin-top:14px;}
+.activity-actions .activity-delete{background:#fff0ef;color:#a52d2d;border:1px solid #f0c8c8;}
+.activity-empty,.activity-loading{padding:26px 8px;text-align:center;color:var(--muted);font-size:14px;}
+@media(max-width:600px){.activity-form-grid{grid-template-columns:1fr;}.activity-field.full{grid-column:auto;}.activity-form-panel,.activity-card{padding:17px;}.activity-card-head{flex-direction:column;}}
+</style>
+</head>
+<body>
+<main class="bw-page">
+  <h1 class="bw-page-title">🧭 탐활서</h1>
+  <p class="bw-page-sub">탐구활동 신청 내용을 확인할 수 있어요.</p>
+  <div class="activity-toolbar" id="activity-toolbar" hidden>
+    <button id="activity-create" type="button">탐활 발급</button>
+  </div>
+  <section class="activity-form-panel" id="activity-form-panel" hidden aria-labelledby="activity-form-title">
+    <h2 class="activity-form-title" id="activity-form-title">탐활 발급</h2>
+    <form id="activity-form">
+      <div class="activity-form-grid">
+        <div class="activity-field">
+          <label for="activity-representative">대표 학생</label>
+          <select id="activity-representative" required></select>
+        </div>
+        <div class="activity-field">
+          <label for="activity-time">탐활 시간</label>
+          <select id="activity-time" required>
+            <option value="">시간 선택</option>
+            <option value="1면학(7시 10분~8시 20분)">1면학 (7시 10분~8시 20분)</option>
+            <option value="2면학(8시 30분~9시 30분)">2면학 (8시 30분~9시 30분)</option>
+            <option value="3면학(9시 50분~11시 30분)">3면학 (9시 50분~11시 30분)</option>
+          </select>
+        </div>
+        <div class="activity-field full">
+          <span id="activity-students-label" class="activity-field-label">학생 목록</span>
+          <div class="activity-student-list" id="activity-students" role="group" aria-labelledby="activity-students-label"></div>
+          <span class="activity-hint">대표 학생은 학생 목록에 자동으로 포함됩니다.</span>
+        </div>
+        <div class="activity-field full">
+          <label for="activity-location">탐활 장소</label>
+          <input id="activity-location" type="text" maxlength="120" required placeholder="예: 물리실험실"/>
+        </div>
+      </div>
+      <div class="activity-form-actions">
+        <button class="activity-cancel" id="activity-cancel" type="button">취소</button>
+        <button id="activity-submit" type="submit">발급</button>
+      </div>
+      <p class="activity-status" id="activity-status" aria-live="polite"></p>
+    </form>
+  </section>
+  <div class="activity-list" id="activity-list" aria-live="polite">
+    <p class="activity-loading">탐활 목록을 불러오는 중...</p>
+  </div>
+</main>
+<script src="config.js"></script>
+<script src="native-bridge.js"></script>
+<script src="common.js"></script>
+<script>
+(function(){
+  const session = window.GwakuriAuth.getSession();
+  const canManage = !!session && (session.role === 'admin' || session.role === 'teacher');
+  const list = document.getElementById('activity-list');
+  const toolbar = document.getElementById('activity-toolbar');
+  const formPanel = document.getElementById('activity-form-panel');
+  const form = document.getElementById('activity-form');
+  const formTitle = document.getElementById('activity-form-title');
+  const submitButton = document.getElementById('activity-submit');
+  const status = document.getElementById('activity-status');
+  const representative = document.getElementById('activity-representative');
+  const students = document.getElementById('activity-students');
+  let editingId = '';
+
+  function escapeHtml(value){
+    const element = document.createElement('div');
+    element.textContent = String(value == null ? '' : value);
+    return element.innerHTML;
+  }
+
+  function escapeAttribute(value){
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+      .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function formatDate(value){
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? '' : date.toLocaleString('ko-KR', {
+      year:'numeric', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  function allStudents(roster){
+    return (roster.classes || []).reduce((all, item)=>all.concat(item.students || []), [])
+      .concat(roster.unassigned || [])
+      .sort((a, b)=>String(a.studentId || '').localeCompare(String(b.studentId || '')) ||
+        String(a.username || '').localeCompare(String(b.username || '')));
+  }
+
+  function fillStudentOptions(roster){
+    const members = allStudents(roster);
+    const options = members.map((student, index)=>
+      `<label class="activity-student-option" for="activity-student-${index}">
+        <input id="activity-student-${index}" type="checkbox" value="${escapeAttribute(student.username)}"/>
+        <span>${escapeHtml(student.username)}${student.studentId ? ' · ' + escapeHtml(student.studentId) : ''}</span>
+      </label>`
+    ).join('');
+    representative.innerHTML = `<option value="">대표 학생 선택</option>${members.map(student=>
+      `<option value="${escapeAttribute(student.username)}">${escapeHtml(student.username)}${student.studentId ? ' · ' + escapeHtml(student.studentId) : ''}</option>`
+    ).join('')}`;
+    students.innerHTML = options;
+    if(!options) students.innerHTML = '<span class="activity-hint">등록된 학생이 없어요.</span>';
+  }
+
+  function showForm(activity){
+    form.reset();
+    editingId = activity ? activity.id : '';
+    formTitle.textContent = activity ? '탐활 수정' : '탐활 발급';
+    submitButton.textContent = activity ? '수정' : '발급';
+    status.textContent = '';
+    status.className = 'activity-status';
+    if(activity){
+      representative.value = activity.representative;
+      students.querySelectorAll('input[type="checkbox"]').forEach(option=>{
+        option.checked = activity.students.some(name=>name === option.value);
+      });
+      document.getElementById('activity-location').value = activity.location;
+      document.getElementById('activity-time').value = activity.time;
+    }
+    formPanel.hidden = false;
+    formPanel.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  function renderActivities(activities){
+    if(!activities.length){
+      list.innerHTML = '<p class="activity-empty">등록된 탐활이 없어요.</p>';
+      return;
+    }
+    list.innerHTML = activities.map(activity=>{
+      const actions = canManage ? `<div class="activity-actions">
+        <button type="button" data-edit-activity="${escapeAttribute(activity.id)}">수정</button>
+        <button type="button" class="activity-delete" data-delete-activity="${escapeAttribute(activity.id)}">삭제</button>
+      </div>` : '';
+      return `<article class="activity-card">
+        <div class="activity-card-head">
+          <h2 class="activity-title">${escapeHtml(activity.representative)} 대표 탐활</h2>
+          <span class="activity-time">${escapeHtml(activity.time)}</span>
+        </div>
+        <div class="activity-detail">
+          <div class="activity-detail-row"><span class="activity-detail-label">대표 학생</span><strong>${escapeHtml(activity.representative)}</strong></div>
+          <div class="activity-detail-row"><span class="activity-detail-label">학생 목록</span><span class="activity-students">${activity.students.map(escapeHtml).join(', ')}</span></div>
+          <div class="activity-detail-row"><span class="activity-detail-label">탐활 장소</span><span>${escapeHtml(activity.location)}</span></div>
+        </div>
+        <p class="activity-meta">발급: ${escapeHtml(activity.createdBy)} · ${escapeHtml(formatDate(activity.createdAt))}</p>
+        ${actions}
+      </article>`;
+    }).join('');
+    list.querySelectorAll('[data-edit-activity]').forEach(button=>{
+      button.addEventListener('click', ()=>{
+        const activity = activities.find(item=>item.id === button.dataset.editActivity);
+        if(activity) showForm(activity);
+      });
+    });
+    list.querySelectorAll('[data-delete-activity]').forEach(button=>{
+      button.addEventListener('click', async ()=>{
+        if(!confirm('이 탐활서를 삭제할까요?')) return;
+        button.disabled = true;
+        try{
+          const result = await window.GwakuriAuth.call('activityDelete', { id: button.dataset.deleteActivity });
+          if(!result.success) throw new Error(result.message || '탐활 삭제에 실패했어요.');
+          await load();
+        }catch(error){
+          alert(error.message || '탐활 삭제에 실패했어요.');
+          button.disabled = false;
+        }
+      });
+    });
+  }
+
+  async function load(){
+    list.innerHTML = '<p class="activity-loading">탐활 목록을 불러오는 중...</p>';
+    try{
+      const requests = [window.GwakuriAuth.call('activityList', {})];
+      if(canManage) requests.push(window.GwakuriAuth.call('listSchoolStudents', {}));
+      const results = await Promise.all(requests);
+      const activityResult = results[0];
+      if(!activityResult || !activityResult.success) throw new Error(activityResult && activityResult.message || '탐활 목록을 불러오지 못했어요.');
+      if(canManage){
+        const roster = results[1];
+        if(!roster || !roster.success) throw new Error(roster && roster.message || '학생 목록을 불러오지 못했어요.');
+        fillStudentOptions(roster);
+      }
+      renderActivities(activityResult.activities || []);
+    }catch(error){
+      list.innerHTML = `<p class="activity-empty">${escapeHtml(error.message || '탐활 목록을 불러오지 못했어요.')}</p>`;
+    }
+  }
+
+  if(canManage){
+    toolbar.hidden = false;
+    document.getElementById('activity-create').addEventListener('click', ()=>showForm(null));
+    document.getElementById('activity-cancel').addEventListener('click', ()=>{
+      formPanel.hidden = true;
+      editingId = '';
+      form.reset();
+    });
+    representative.addEventListener('change', ()=>{
+      const option = Array.from(students.querySelectorAll('input[type="checkbox"]'))
+        .find(item=>item.value === representative.value);
+      if(option) option.checked = true;
+    });
+    form.addEventListener('submit', async event=>{
+      event.preventDefault();
+      const studentNames = Array.from(students.querySelectorAll('input[type="checkbox"]:checked'))
+        .map(option=>option.value);
+      if(representative.value && !studentNames.includes(representative.value)) studentNames.push(representative.value);
+      if(!studentNames.length){
+        status.textContent = '학생 목록을 선택해주세요.';
+        status.className = 'activity-status error';
+        return;
+      }
+      submitButton.disabled = true;
+      status.textContent = editingId ? '수정 중...' : '발급 중...';
+      status.className = 'activity-status';
+      try{
+        const payload = {
+          representative: representative.value,
+          students: JSON.stringify(studentNames),
+          location: document.getElementById('activity-location').value.trim(),
+          time: document.getElementById('activity-time').value
+        };
+        const result = await window.GwakuriAuth.call(editingId ? 'activityUpdate' : 'activityCreate',
+          editingId ? Object.assign({ id: editingId }, payload) : payload);
+        if(!result.success) throw new Error(result.message || '탐활 저장에 실패했어요.');
+        formPanel.hidden = true;
+        editingId = '';
+        form.reset();
+        await load();
+      }catch(error){
+        status.textContent = error.message || '탐활 저장에 실패했어요.';
+        status.className = 'activity-status error';
+      }finally{
+        submitButton.disabled = false;
+      }
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

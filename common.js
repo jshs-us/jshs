@@ -247,7 +247,7 @@ body{
       <li><a href="calendar.html"  ${current==='calendar.html'?'class="active"':''}>학사일정</a></li>
       <li><a href="meal.html"      ${current==='meal.html'?'class="active"':''}>급식</a></li>
       <li><a href="board.html" ${current==='board.html'?'class="active"':''}>게시판</a></li>
-      <li><a href="fine.html" ${current==='fine.html'?'class="active"':''}>벌금</a></li>
+      <li><a href="activities.html" ${current==='activities.html'?'class="active"':''}>탐활서</a></li>
       <li><a href="school.html"     ${current==='school.html'?'class="active"':''}>우리 학교</a></li>
       ${userBlock}
     </ul>

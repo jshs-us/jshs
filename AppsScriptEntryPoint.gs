@@ -41,6 +41,11 @@ const APP_TABLES = {
     headers: ['id', 'sender', 'recipient', 'content', 'createdAt', 'fileUrl', 'fileName'],
     appendMissing: true
   },
+  activities: {
+    name: '탐활',
+    headers: ['id', 'representative', 'students', 'location', 'time', 'createdBy', 'createdAt', 'updatedAt'],
+    appendMissing: true
+  },
   eggs: {
     name: '이스터에그기록',
     headers: ['username', 'eggId', 'best', 'updatedAt'],
@@ -55,6 +60,7 @@ const MAX_POST_TITLE = 120;
 const MAX_POST_CONTENT = 12000;
 const MAX_COMMENT_LENGTH = 2000;
 const MAX_DM_LENGTH = 2000;
+const ACTIVITY_TIMES = ['1면학(7시 10분~8시 20분)', '2면학(8시 30분~9시 30분)', '3면학(9시 50분~11시 30분)'];
 
 function doPost(e) {
   if (typeof Security === 'undefined' || typeof Security.wrap !== 'function') {
@@ -76,6 +82,10 @@ function doPost_original(e) {
     listDmThreads: actionListDmThreads_,
     listDmConversation: actionListDmConversation_,
     sendDm: actionSendDm_,
+    activityList: actionActivityList_,
+    activityCreate: actionActivityCreate_,
+    activityUpdate: actionActivityUpdate_,
+    activityDelete: actionActivityDelete_,
     listPosts: actionListPosts_,
     getPost: actionGetPost_,
     createPostDirect: actionCreatePost_,
@@ -674,6 +684,7 @@ function normalizeRole_(value) {
   const role = String(value == null ? '' : value).trim().toLowerCase();
   if (role === 'admin' || role === '관리자') return 'admin';
   if (role === 'manager' || role === '매니저') return 'manager';
+  if (role === 'teacher' || role === '선생님') return 'teacher';
   return 'user';
 }
 
@@ -943,17 +954,24 @@ function actionListSchoolStudents_() {
     }
   }
   const unassigned = [];
+  const teachers = [];
   tableRows_('members').forEach(function (row) {
     const username = String(row.username || '').trim();
     if (!username) return;
     const studentId = String(row.studentId || '').trim();
+    const role = normalizeRole_(row.role);
     const match = /^(\d{4})-([1-3])-([1-4])-(\d{2})$/.exec(studentId);
     const student = {
       username: username,
       studentId: studentId,
+      role: role,
       profileImageUrl: cloudinaryUrl_(row.profileImageUrl, userUploadFolder_('profile', username), 'image')
         ? String(row.profileImageUrl) : ''
     };
+    if (role === 'teacher') {
+      teachers.push(student);
+      return;
+    }
     if (match) {
       classIndex[match[2] + '-' + match[3]].students.push(student);
     } else {
@@ -966,7 +984,118 @@ function actionListSchoolStudents_() {
   unassigned.sort(function (a, b) {
     return a.studentId.localeCompare(b.studentId) || a.username.localeCompare(b.username);
   });
-  return { success: true, classes: classes, unassigned: unassigned };
+  teachers.sort(function (a, b) { return a.username.localeCompare(b.username); });
+  return { success: true, classes: classes, unassigned: unassigned, teachers: teachers };
+}
+
+function activityObject_(row) {
+  let students;
+  try {
+    students = JSON.parse(String(row.students || ''));
+  } catch (error) {
+    throw new Error('저장된 탐활 학생 목록을 읽을 수 없어요.');
+  }
+  if (!Array.isArray(students) || students.some(function (name) { return typeof name !== 'string'; })) {
+    throw new Error('저장된 탐활 학생 목록 형식이 올바르지 않아요.');
+  }
+  return {
+    id: String(row.id || ''),
+    representative: String(row.representative || ''),
+    students: students,
+    location: String(row.location || ''),
+    time: String(row.time || ''),
+    createdBy: String(row.createdBy || ''),
+    createdAt: row.createdAt || '',
+    updatedAt: row.updatedAt || ''
+  };
+}
+
+function activityRecordFromParams_(p) {
+  const representativeName = requiredText_(p.representative, '대표 학생', 30);
+  const representative = findMember_(representativeName);
+  if (!representative || normalizeRole_(representative.role) === 'teacher') {
+    throw new Error('대표 학생을 회원 목록에서 선택해주세요.');
+  }
+  const rawStudents = requiredText_(p.students, '학생 목록', 10000);
+  let requestedStudents;
+  try {
+    requestedStudents = JSON.parse(rawStudents);
+  } catch (error) {
+    throw new Error('학생 목록을 확인해주세요.');
+  }
+  if (!Array.isArray(requestedStudents) || requestedStudents.length === 0 || requestedStudents.length > 100) {
+    throw new Error('학생 목록을 선택해주세요. (최대 100명)');
+  }
+  const studentNames = [];
+  requestedStudents.forEach(function (name) {
+    const requestedName = requiredText_(name, '학생', 30);
+    if (studentNames.some(function (saved) { return sameName_(saved, requestedName); })) {
+      throw new Error('학생 목록에 같은 이름이 중복되어 있어요.');
+    }
+    const member = findMember_(requestedName);
+    if (!member || normalizeRole_(member.role) === 'teacher') {
+      throw new Error('회원 목록에 없는 학생이 포함되어 있어요.');
+    }
+    studentNames.push(String(member.username));
+  });
+  if (!studentNames.some(function (name) { return sameName_(name, representative.username); })) {
+    throw new Error('대표 학생은 학생 목록에도 포함되어야 해요.');
+  }
+  const time = requiredText_(p.time, '탐활 시간', 80);
+  if (ACTIVITY_TIMES.indexOf(time) < 0) throw new Error('탐활 시간을 선택해주세요.');
+  return {
+    representative: String(representative.username),
+    students: JSON.stringify(studentNames),
+    location: requiredText_(p.location, '탐활 장소', 120),
+    time: time
+  };
+}
+
+function actionActivityList_() {
+  const activities = tableRows_('activities').map(activityObject_);
+  activities.sort(function (a, b) { return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(); });
+  return { success: true, activities: activities };
+}
+
+function actionActivityCreate_(p) {
+  return withWriteLock_(function () {
+    const fields = activityRecordFromParams_(p);
+    const now = nowIso_();
+    const activity = {
+      id: newId_(), representative: fields.representative, students: fields.students,
+      location: fields.location, time: fields.time, createdBy: requiredText_(p.username, '작성자', 30),
+      createdAt: now, updatedAt: now
+    };
+    appendRecord_('activities', activity);
+    return { success: true, activity: activityObject_(activity) };
+  });
+}
+
+function actionActivityUpdate_(p) {
+  const id = requiredText_(p.id, '탐활', 80);
+  return withWriteLock_(function () {
+    const sheet = table_('activities');
+    const row = tableRows_('activities').find(function (item) { return String(item.id) === id; });
+    if (!row) throw new Error('탐활 정보를 찾을 수 없어요.');
+    const fields = activityRecordFromParams_(p);
+    setByHeader_(sheet, row.__row, 'representative', fields.representative);
+    setByHeader_(sheet, row.__row, 'students', fields.students);
+    setByHeader_(sheet, row.__row, 'location', fields.location);
+    setByHeader_(sheet, row.__row, 'time', fields.time);
+    setByHeader_(sheet, row.__row, 'updatedAt', nowIso_());
+    return { success: true };
+  });
+}
+
+function actionActivityDelete_(p) {
+  const id = requiredText_(p.id, '탐활', 80);
+  return withWriteLock_(function () {
+    const sheet = table_('activities');
+    const row = tableRows_('activities').find(function (item) { return String(item.id) === id; });
+    if (!row) throw new Error('탐활 정보를 찾을 수 없어요.');
+    sheet.deleteRow(row.__row);
+    return { success: true };
+  });
 }
 
 function dmMessageObject_(row, username) {
@@ -1023,7 +1152,7 @@ function actionListDmConversation_(p) {
     success: true,
     peerUsername: String(peer.username),
     messages: messages.map(function (row) { return dmMessageObject_(row, username); })
-  });
+  };
 }
 
 function actionSendDm_(p) {
@@ -1294,7 +1423,7 @@ function ensureNotProtectedMember_(member, actor) {
 function actionSetRole_(p) {
   const target = requiredText_(p.targetUsername, '대상 회원', 30);
   const role = String(p.newRole || '').trim();
-  if (['user', 'manager', 'admin'].indexOf(role) < 0) throw new Error('올바르지 않은 권한이에요.');
+  if (['user', 'manager', 'admin', 'teacher'].indexOf(role) < 0) throw new Error('올바르지 않은 권한이에요.');
   return withWriteLock_(function () {
     const member = findMember_(target);
     ensureNotProtectedMember_(member, p.actor);

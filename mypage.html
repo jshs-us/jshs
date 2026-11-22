@@ -251,6 +251,7 @@
       setProfilePreview(currentProfileImageUrl);
       const rb = r.role==='admin' ? '<span class="mp-badge mp-badge-admin">관리자</span>'
         : r.role==='manager' ? '<span class="mp-badge mp-badge-manager">매니저</span>'
+        : r.role==='teacher' ? '<span class="mp-badge mp-badge-manager">선생님</span>'
         : '<span class="mp-badge mp-badge-user">일반</span>';
       const mb = r.muted ? '<span class="mp-badge mp-badge-muted">작성 금지됨</span>' : '';
       infoBox.innerHTML = `

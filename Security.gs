@@ -23,6 +23,7 @@ var Security = (function () {
     PUBLIC_ACTIONS: ['login', 'signup', 'requestEmailCode', 'verifyEmailCode'],
     ADMIN_ONLY: ['listUsers', 'setRole', 'setMuted', 'resetPassword', 'kickUser'],
     MANAGER_UP: ['adminDeletePost'],
+    ACTIVITY_MANAGERS: ['activityCreate', 'activityUpdate', 'activityDelete'],
     FINE_ADMIN_ONLY: ['fineListAll', 'fineCreate', 'fineUpdateStatus']
   };
 
@@ -324,6 +325,9 @@ var Security = (function () {
       }
       if (CONFIG.MANAGER_UP.indexOf(action) >= 0 && user.role !== 'admin' && user.role !== 'manager') {
         return { ok: false, response: { success: false, message: '권한이 없어요.', code: 'FORBIDDEN' } };
+      }
+      if (CONFIG.ACTIVITY_MANAGERS.indexOf(action) >= 0 && user.role !== 'admin' && user.role !== 'teacher') {
+        return { ok: false, response: { success: false, message: '탐활 관리 권한이 없어요.', code: 'FORBIDDEN' } };
       }
       if (CONFIG.FINE_ADMIN_ONLY.indexOf(action) >= 0 && CONFIG.FINE_ADMINS.indexOf(user.username) < 0) {
         return { ok: false, response: { success: false, message: '권한이 없어요.', code: 'FORBIDDEN' } };

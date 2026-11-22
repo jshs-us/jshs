@@ -189,14 +189,15 @@
       ? `<img class="school-avatar" src="${escapeAttribute(student.profileImageUrl)}" alt="" loading="lazy"/>`
       : `<span class="school-avatar school-avatar-fallback" aria-hidden="true">${escapeHtml(String(student.username || '?').trim().slice(0, 1) || '?')}</span>`;
     const isSelf = sameUser(student.username, session.username);
+    const sublabel = student.role === 'teacher' ? '선생님' : student.studentId || '학번 미등록';
     const openButton = isSelf
       ? `<span class="school-student-open" aria-disabled="true">${avatar}<span class="school-student-details">
           <span class="school-student-name">${escapeHtml(student.username)} (나)</span>
-          <span class="school-student-id">${escapeHtml(student.studentId || '학번 미등록')}</span>
+          <span class="school-student-id">${escapeHtml(sublabel)}</span>
         </span></span>`
       : `<button class="school-student-open" type="button" data-dm-peer="${escapeAttribute(student.username)}" aria-label="${escapeAttribute(student.username)}님에게 DM 보내기">${avatar}<span class="school-student-details">
           <span class="school-student-name">${escapeHtml(student.username)}</span>
-          <span class="school-student-id">${escapeHtml(student.studentId || '학번 미등록')}</span>
+          <span class="school-student-id">${escapeHtml(sublabel)}</span>
         </span></button>`;
     const user = manageUsers[String(student.username || '').toLowerCase()];
     const canManage = isAdmin && user && !user.isFounder && !isSelf;
@@ -204,6 +205,7 @@
       <select class="school-role-select" data-user-role="${escapeAttribute(user.username)}" aria-label="${escapeAttribute(user.username)} 권한">
         <option value="user"${user.role === 'user' ? ' selected' : ''}>일반</option>
         <option value="manager"${user.role === 'manager' ? ' selected' : ''}>매니저</option>
+        <option value="teacher"${user.role === 'teacher' ? ' selected' : ''}>선생님</option>
         <option value="admin"${user.role === 'admin' ? ' selected' : ''}>관리자</option>
       </select>
       <button type="button" data-user-mute="${escapeAttribute(user.username)}" data-muted="${user.muted ? '1' : '0'}">${user.muted ? '작성금지 해제' : '작성금지'}</button>
@@ -263,6 +265,16 @@
           <ul class="school-students">${result.unassigned.map(studentMarkup).join('')}</ul>
         </section>`;
       }
+      const teachers = result.teachers || [];
+      html += `<section class="school-unassigned">
+        <div class="school-class-head">
+          <h2 class="school-class-title">선생님</h2>
+          <span class="school-count">${teachers.length}명</span>
+        </div>
+        ${teachers.length
+          ? `<ul class="school-students">${teachers.map(studentMarkup).join('')}</ul>`
+          : '<p class="school-empty">등록된 선생님이 없어요.</p>'}
+      </section>`;
       roster.className = '';
       roster.innerHTML = html;
       roster.querySelectorAll('[data-dm-peer]').forEach(button=>{
