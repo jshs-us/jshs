@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<link rel="icon" href="favicon.ico" sizes="any"/>
+<link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icons/favicon-192.png"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
+<meta name="theme-color" content="#061442"/>
+<style>html{visibility:hidden}</style>
+<title>우리 학교 — 과학구리</title>
+<style>
+.school-grade{margin:0 0 34px;}
+.school-grade-title{font-size:22px;font-weight:850;color:var(--navy2);margin-bottom:14px;}
+.school-classes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.school-class,.school-unassigned{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;
+}
+.school-class-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.school-class-title{font-size:17px;font-weight:800;color:var(--navy2);}
+.school-count{font-size:12px;color:var(--muted);background:#eef1f8;padding:3px 9px;border-radius:20px;}
+.school-students{list-style:none;display:grid;gap:8px;}
+.school-student{display:flex;align-items:center;gap:10px;min-width:0;}
+.school-avatar{width:34px;height:34px;border-radius:50%;object-fit:cover;background:#eef1f8;flex:none;}
+.school-avatar-fallback{display:grid;place-items:center;color:var(--navy);font-size:14px;font-weight:800;}
+.school-student-info{min-width:0;display:flex;flex-direction:column;line-height:1.35;}
+.school-student-name{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.school-student-id{font-size:12px;color:var(--muted);}
+.school-empty,.school-loading{color:var(--muted);font-size:14px;padding:8px 0;}
+.school-unassigned{margin-top:22px;}
+.school-note{margin-top:-18px;margin-bottom:24px;color:var(--muted);font-size:13px;}
+.school-dm-panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:30px;}
+.school-dm-layout{display:grid;grid-template-columns:minmax(210px,.7fr) minmax(0,1.3fr);gap:18px;}
+.school-dm-threads{display:grid;align-content:start;gap:6px;max-height:440px;overflow-y:auto;}
+.school-thread{width:100%;text-align:left;border:1px solid transparent;border-radius:9px;padding:10px;background:#f7f8fc;color:var(--ink);font:inherit;cursor:pointer;}
+.school-thread.active,.school-thread:hover{border-color:var(--navy);background:#fff;}
+.school-thread-name{display:flex;justify-content:space-between;font-size:14px;font-weight:750;}
+.school-thread-preview{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;}
+.school-conversation{min-height:320px;border:1px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;}
+.school-conversation-title{font-weight:800;color:var(--navy2);margin-bottom:10px;}
+.school-messages{display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:320px;padding:2px 4px 12px;}
+.school-message{max-width:85%;align-self:flex-start;border-radius:12px;background:#eef1f8;padding:9px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;}
+.school-message.mine{align-self:flex-end;background:#fff8a8;}
+.school-message-time{display:block;color:var(--muted);font-size:10px;margin-top:4px;text-align:right;}
+.school-message-attachment{display:block;margin:0 0 6px;}
+.school-message-attachment img{display:block;max-width:min(100%,360px);max-height:300px;border-radius:8px;}
+.school-message-attachment a{color:var(--navy);font-weight:700;overflow-wrap:anywhere;}
+.school-dm-form{display:grid;gap:8px;margin-top:auto;padding-top:10px;}
+.school-dm-compose{display:flex;gap:8px;align-items:flex-end;}
+.school-dm-form textarea{flex:1;min-width:0;resize:vertical;min-height:48px;max-height:140px;border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit;}
+.school-dm-form button,.school-dm-refresh{border:0;border-radius:9px;background:var(--navy);color:#fff;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer;}
+.school-dm-form button:disabled{opacity:.55;cursor:default;}
+.school-dm-file-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--muted);}
+.school-dm-file-row button{background:#eef1f8;color:var(--ink);padding:7px 10px;}
+.school-dm-file-name{overflow-wrap:anywhere;}
+.school-student-item{min-width:0;}
+.school-student-open{display:flex;align-items:center;gap:10px;width:100%;min-width:0;border:0;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer;padding:5px;border-radius:8px;}
+.school-student-open:hover{background:#f4f6fb;}
+.school-student-open[aria-disabled="true"]{cursor:default;}
+.school-student-open[aria-disabled="true"]:hover{background:transparent;}
+.school-student-details{min-width:0;display:flex;flex-direction:column;line-height:1.35;}
+.school-student-name{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.school-student-id{font-size:12px;color:var(--muted);}
+.school-admin-controls{display:flex;flex-wrap:wrap;gap:5px;margin:4px 0 8px 49px;}
+.school-admin-controls button,.school-role-select{font:inherit;font-size:11px;border:1px solid var(--line);border-radius:7px;padding:5px 7px;background:#fff;color:var(--ink);}
+.school-admin-controls button{cursor:pointer;}
+.school-admin-controls .school-danger{color:#b3432b;border-color:#f0c8c8;}
+.school-role-select{max-width:95px;}
+.school-admin-note{font-size:12px;color:var(--muted);margin:0 0 12px;}
+@media(max-width:560px){.school-classes{grid-template-columns:1fr;}.school-class{padding:16px;}}
+@media(max-width:680px){.school-dm-layout{grid-template-columns:1fr;}.school-conversation{min-height:270px;}}
+</style>
+</head>
+<body>
+<main class="bw-page">
+  <h1 class="bw-page-title">🏫 우리 학교</h1>
+  <p class="bw-page-sub">가입된 학생을 학년과 반별로 확인할 수 있어요.</p>
+  <p class="school-note">학번이 등록되지 않았거나 학급을 확인할 수 없는 회원은 아래 ‘학급 미등록’에 표시돼요. 접속 중 여부는 표시하지 않습니다.</p>
+  <section class="school-dm-panel" aria-labelledby="school-dm-title">
+    <div class="school-class-head">
+      <h2 class="school-class-title" id="school-dm-title">💬 DM</h2>
+      <button class="school-dm-refresh" id="school-dm-refresh" type="button">대화 새로고침</button>
+    </div>
+    <div class="school-dm-layout">
+      <div>
+        <h3 class="school-class-title" style="font-size:14px;margin-bottom:8px">대화 목록</h3>
+        <div id="school-dm-threads" class="school-dm-threads"><p class="school-loading">불러오는 중...</p></div>
+      </div>
+      <div id="school-dm-conversation" class="school-conversation" aria-live="polite">
+        <p class="school-empty">학생 목록에서 대화할 학생을 선택하세요.</p>
+      </div>
+    </div>
+  </section>
+  <p class="school-admin-note" id="school-admin-note" hidden></p>
+  <div id="school-roster" class="school-loading" aria-live="polite">학생 목록을 불러오는 중...</div>
+</main>
+<script src="config.js"></script>
+<script src="native-bridge.js"></script>
+<script src="common.js"></script>
+<script>
+(function(){
+  const roster = document.getElementById('school-roster');
+  const dmThreads = document.getElementById('school-dm-threads');
+  const dmConversation = document.getElementById('school-dm-conversation');
+  const adminNote = document.getElementById('school-admin-note');
+  const session = window.GwakuriAuth.getSession();
+  const isAdmin = session && session.role === 'admin';
+  const maxDmFileSize = 50 * 1024 * 1024;
+  let activePeer = '';
+  let selectedDmFile = null;
+  let manageUsers = {};
+
+  const escapeHtml = value => {
+    const element = document.createElement('div');
+    element.textContent = String(value == null ? '' : value);
+    return element.innerHTML;
+  };
+  const escapeAttribute = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function sameUser(a, b){
+    return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  }
+
+  function formatDate(value){
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? '' : date.toLocaleString('ko-KR', {
+      month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+  }
+
+  function attachmentMarkup(message){
+    if(!message.fileUrl) return '';
+    const url = escapeAttribute(message.fileUrl);
+    const name = escapeHtml(message.fileName || '첨부파일');
+    const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(message.fileName || '');
+    const link = `<a href="${url}" target="_blank" rel="noopener noreferrer">${name}</a>`;
+    return `<div class="school-message-attachment">${isImage
+      ? `<a href="${url}" target="_blank" rel="noopener noreferrer"><img src="${url}" alt="${name}" loading="lazy"/></a>`
+      : link}</div>`;
+  }
+
+  function uploadDmFile(file, onProgress){
+    return window.GwakuriAuth.call('getUploadSignature', { purpose: 'dm' }).then(signature=>{
+      if(!signature || !signature.success) throw new Error(signature && signature.message || '업로드 권한을 확인하지 못했어요.');
+      return new Promise((resolve, reject)=>{
+        const data = new FormData();
+        data.append('file', file);
+        data.append('api_key', signature.apiKey);
+        data.append('timestamp', signature.timestamp);
+        data.append('folder', signature.folder);
+        data.append('public_id', signature.publicId);
+        data.append('overwrite', String(signature.overwrite));
+        data.append('signature', signature.signature);
+        const request = new XMLHttpRequest();
+        request.open('POST', `https://api.cloudinary.com/v1_1/${signature.cloud}/auto/upload`, true);
+        request.upload.onprogress = event=>{
+          if(event.lengthComputable && onProgress) onProgress(Math.round(event.loaded / event.total * 100));
+        };
+        request.onload = ()=>{
+          if(request.status >= 200 && request.status < 300){
+            try{
+              const result = JSON.parse(request.responseText);
+              if(!result.secure_url) throw new Error('업로드 주소를 받지 못했어요.');
+              resolve({ fileUrl: result.secure_url, fileName: file.name });
+            }catch(error){ reject(error); }
+          }else{
+            let message = '파일 업로드에 실패했어요.';
+            try{
+              const result = JSON.parse(request.responseText);
+              if(result.error && result.error.message) message = result.error.message;
+            }catch(error){}
+            reject(new Error(message));
+          }
+        };
+        request.onerror = ()=>reject(new Error('파일 업로드 중 네트워크 오류가 발생했어요.'));
+        request.ontimeout = ()=>reject(new Error('파일 업로드 시간이 초과됐어요.'));
+        request.timeout = 120000;
+        request.send(data);
+      });
+    });
+  }
+
+  function studentMarkup(student){
+    const avatar = student.profileImageUrl
+      ? `<img class="school-avatar" src="${escapeAttribute(student.profileImageUrl)}" alt="" loading="lazy"/>`
+      : `<span class="school-avatar school-avatar-fallback" aria-hidden="true">${escapeHtml(String(student.username || '?').trim().slice(0, 1) || '?')}</span>`;
+    const isSelf = sameUser(student.username, session.username);
+    const openButton = isSelf
+      ? `<span class="school-student-open" aria-disabled="true">${avatar}<span class="school-student-details">
+          <span class="school-student-name">${escapeHtml(student.username)} (나)</span>
+          <span class="school-student-id">${escapeHtml(student.studentId || '학번 미등록')}</span>
+        </span></span>`
+      : `<button class="school-student-open" type="button" data-dm-peer="${escapeAttribute(student.username)}" aria-label="${escapeAttribute(student.username)}님에게 DM 보내기">${avatar}<span class="school-student-details">
+          <span class="school-student-name">${escapeHtml(student.username)}</span>
+          <span class="school-student-id">${escapeHtml(student.studentId || '학번 미등록')}</span>
+        </span></button>`;
+    const user = manageUsers[String(student.username || '').toLowerCase()];
+    const canManage = isAdmin && user && !user.isFounder && !isSelf;
+    const actions = canManage ? `<div class="school-admin-controls">
+      <select class="school-role-select" data-user-role="${escapeAttribute(user.username)}" aria-label="${escapeAttribute(user.username)} 권한">
+        <option value="user"${user.role === 'user' ? ' selected' : ''}>일반</option>
+        <option value="manager"${user.role === 'manager' ? ' selected' : ''}>매니저</option>
+        <option value="admin"${user.role === 'admin' ? ' selected' : ''}>관리자</option>
+      </select>
+      <button type="button" data-user-mute="${escapeAttribute(user.username)}" data-muted="${user.muted ? '1' : '0'}">${user.muted ? '작성금지 해제' : '작성금지'}</button>
+      <button type="button" data-user-reset="${escapeAttribute(user.username)}">비밀번호 초기화</button>
+      <button type="button" class="school-danger" data-user-kick="${escapeAttribute(user.username)}">강제 탈퇴</button>
+    </div>` : '';
+    return `<li class="school-student-item">${openButton}${actions}</li>`;
+  }
+
+  function classMarkup(item){
+    const students = item.students || [];
+    return `<article class="school-class">
+      <div class="school-class-head">
+        <h3 class="school-class-title">${item.grade}학년 ${item.classNumber}반</h3>
+        <span class="school-count">${students.length}명</span>
+      </div>
+      ${students.length
+        ? `<ul class="school-students">${students.map(studentMarkup).join('')}</ul>`
+        : '<p class="school-empty">가입한 학생이 아직 없어요.</p>'}
+    </article>`;
+  }
+
+  async function loadRoster(){
+    try{
+      const result = await window.GwakuriAuth.call('listSchoolStudents', {});
+      if(!result || !result.success){
+        roster.className = 'school-empty';
+        roster.textContent = result && result.message || '학생 목록을 불러오지 못했어요.';
+        return;
+      }
+      if(isAdmin){
+        const usersResult = await window.GwakuriAuth.call('listUsers', {});
+        if(usersResult && usersResult.success){
+          manageUsers = {};
+          usersResult.users.forEach(user=>{ manageUsers[String(user.username || '').toLowerCase()] = user; });
+          adminNote.hidden = true;
+        }else{
+          manageUsers = {};
+          adminNote.textContent = usersResult && usersResult.message || '학생 관리 도구를 불러오지 못했어요.';
+          adminNote.hidden = false;
+        }
+      }
+      let html = '';
+      [1, 2, 3].forEach(grade=>{
+        const classes = result.classes.filter(item=>item.grade === grade);
+        html += `<section class="school-grade" aria-labelledby="school-grade-${grade}">
+          <h2 class="school-grade-title" id="school-grade-${grade}">${grade}학년</h2>
+          <div class="school-classes">${classes.map(classMarkup).join('')}</div>
+        </section>`;
+      });
+      if(result.unassigned && result.unassigned.length){
+        html += `<section class="school-unassigned">
+          <div class="school-class-head">
+            <h2 class="school-class-title">학급 미등록</h2>
+            <span class="school-count">${result.unassigned.length}명</span>
+          </div>
+          <ul class="school-students">${result.unassigned.map(studentMarkup).join('')}</ul>
+        </section>`;
+      }
+      roster.className = '';
+      roster.innerHTML = html;
+      roster.querySelectorAll('[data-dm-peer]').forEach(button=>{
+        button.addEventListener('click', ()=>openConversation(button.dataset.dmPeer));
+      });
+      wireStudentManagement();
+    }catch(error){
+      roster.className = 'school-empty';
+      roster.textContent = '학생 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요.';
+    }
+  }
+
+  function wireStudentManagement(){
+    roster.querySelectorAll('[data-user-role]').forEach(select=>{
+      select.addEventListener('change', async ()=>{
+        const result = await window.GwakuriAuth.call('setRole', {
+          targetUsername: select.dataset.userRole, newRole: select.value
+        });
+        if(!result.success) alert(result.message || '권한 변경에 실패했어요.');
+        await loadRoster();
+      });
+    });
+    roster.querySelectorAll('[data-user-mute]').forEach(button=>{
+      button.addEventListener('click', async ()=>{
+        const result = await window.GwakuriAuth.call('setMuted', {
+          targetUsername: button.dataset.userMute, muted: String(button.dataset.muted === '0')
+        });
+        if(!result.success) alert(result.message || '작성 권한 변경에 실패했어요.');
+        await loadRoster();
+      });
+    });
+    roster.querySelectorAll('[data-user-reset]').forEach(button=>{
+      button.addEventListener('click', async ()=>{
+        if(!confirm(button.dataset.userReset + '님의 임시 비밀번호를 새로 발급할까요?')) return;
+        const result = await window.GwakuriAuth.call('resetPassword', { targetUsername: button.dataset.userReset });
+        alert(result.message || (result.success ? '완료' : '비밀번호 초기화에 실패했어요.'));
+      });
+    });
+    roster.querySelectorAll('[data-user-kick]').forEach(button=>{
+      button.addEventListener('click', async ()=>{
+        if(!confirm(button.dataset.userKick + '님을 강제 탈퇴시킬까요? DM 기록도 삭제됩니다.')) return;
+        const result = await window.GwakuriAuth.call('kickUser', { targetUsername: button.dataset.userKick });
+        if(!result.success){ alert(result.message || '강제 탈퇴에 실패했어요.'); return; }
+        await loadRoster();
+      });
+    });
+  }
+
+  function renderThreads(threads){
+    if(!threads.length){
+      dmThreads.innerHTML = '<p class="school-empty">아직 대화가 없어요. 학생을 눌러 첫 DM을 보내보세요.</p>';
+      return;
+    }
+    dmThreads.innerHTML = threads.map(thread=>`<button class="school-thread${sameUser(thread.peerUsername, activePeer) ? ' active' : ''}" type="button" data-thread-peer="${escapeAttribute(thread.peerUsername)}">
+      <span class="school-thread-name">${escapeHtml(thread.peerUsername)}</span>
+      <span class="school-thread-preview">${escapeHtml(thread.lastMessage)}</span>
+    </button>`).join('');
+    dmThreads.querySelectorAll('[data-thread-peer]').forEach(button=>{
+      button.addEventListener('click', ()=>openConversation(button.dataset.threadPeer));
+    });
+  }
+
+  async function loadThreads(){
+    dmThreads.innerHTML = '<p class="school-loading">대화 목록을 불러오는 중...</p>';
+    try{
+      const result = await window.GwakuriAuth.call('listDmThreads', {});
+      if(!result || !result.success) throw new Error(result && result.message || '대화 목록을 불러오지 못했어요.');
+      renderThreads(result.threads || []);
+    }catch(error){
+      dmThreads.textContent = error.message || '대화 목록을 불러오지 못했어요.';
+    }
+  }
+
+  function renderConversation(peerUsername, messages){
+    const messageMarkup = messages.length ? messages.map(message=>`<div class="school-message${message.fromMe ? ' mine' : ''}">
+      ${attachmentMarkup(message)}${escapeHtml(message.content)}<span class="school-message-time">${escapeHtml(formatDate(message.createdAt))}</span>
+    </div>`).join('') : '<p class="school-empty">첫 메시지를 보내 대화를 시작해보세요.</p>';
+    dmConversation.innerHTML = `<h3 class="school-conversation-title">${escapeHtml(peerUsername)}님과의 DM</h3>
+      <div class="school-messages" id="school-messages">${messageMarkup}</div>
+      <form class="school-dm-form" id="school-dm-form">
+        <div class="school-dm-compose">
+          <textarea id="school-dm-input" maxlength="2000" placeholder="메시지 입력 (선택, 최대 2,000자)"></textarea>
+          <button class="school-dm-submit" type="submit">보내기</button>
+        </div>
+        <div class="school-dm-file-row">
+          <input id="school-dm-file" type="file" hidden/>
+          <button id="school-dm-file-select" type="button">파일 첨부</button>
+          <span class="school-dm-file-name" id="school-dm-file-name">${selectedDmFile ? escapeHtml(selectedDmFile.name) : '파일을 선택하지 않았어요.'}</span>
+          <button id="school-dm-file-remove" type="button"${selectedDmFile ? '' : ' hidden'}>선택 취소</button>
+        </div>
+      </form>
+      <p class="school-dm-status" id="school-dm-status" aria-live="polite"></p>`;
+    const list = document.getElementById('school-messages');
+    list.scrollTop = list.scrollHeight;
+    const fileInput = document.getElementById('school-dm-file');
+    const fileName = document.getElementById('school-dm-file-name');
+    const removeFile = document.getElementById('school-dm-file-remove');
+    document.getElementById('school-dm-file-select').addEventListener('click', ()=>fileInput.click());
+    fileInput.addEventListener('change', ()=>{
+      const file = fileInput.files && fileInput.files[0];
+      if(!file) return;
+      if(file.size > maxDmFileSize){
+        selectedDmFile = null;
+        fileInput.value = '';
+        fileName.textContent = '파일은 50MB 이하여야 해요.';
+        removeFile.hidden = true;
+        return;
+      }
+      selectedDmFile = file;
+      fileName.textContent = file.name;
+      removeFile.hidden = false;
+    });
+    removeFile.addEventListener('click', ()=>{
+      selectedDmFile = null;
+      fileInput.value = '';
+      fileName.textContent = '파일을 선택하지 않았어요.';
+      removeFile.hidden = true;
+    });
+    document.getElementById('school-dm-form').addEventListener('submit', async event=>{
+      event.preventDefault();
+      const input = document.getElementById('school-dm-input');
+      const content = input.value.trim();
+      const file = selectedDmFile;
+      if(!content && !file) return;
+      event.currentTarget.querySelectorAll('textarea, input, button').forEach(control=>{ control.disabled = true; });
+      try{
+        const params = { recipientUsername: peerUsername, content: content };
+        if(file){
+          const uploaded = await uploadDmFile(file, progress=>{
+            const status = document.getElementById('school-dm-status');
+            if(status) status.textContent = `파일 업로드 중... ${progress}%`;
+          });
+          params.fileUrl = uploaded.fileUrl;
+          params.fileName = uploaded.fileName;
+        }
+        const result = await window.GwakuriAuth.call('sendDm', params);
+        if(!result.success) throw new Error(result.message || '메시지를 보내지 못했어요.');
+        selectedDmFile = null;
+        await openConversation(peerUsername);
+      }catch(error){
+        const status = document.getElementById('school-dm-status');
+        if(status) status.textContent = error.message || '메시지를 보내지 못했어요.';
+      }finally{
+        const currentForm = document.getElementById('school-dm-form');
+        if(currentForm) currentForm.querySelectorAll('textarea, input, button').forEach(control=>{ control.disabled = false; });
+      }
+    });
+  }
+
+  async function openConversation(peerUsername){
+    if(!sameUser(peerUsername, activePeer)) selectedDmFile = null;
+    activePeer = peerUsername;
+    dmConversation.innerHTML = '<p class="school-loading">대화를 불러오는 중...</p>';
+    try{
+      const result = await window.GwakuriAuth.call('listDmConversation', { peerUsername: peerUsername });
+      if(!result || !result.success) throw new Error(result && result.message || '대화를 불러오지 못했어요.');
+      activePeer = result.peerUsername;
+      renderConversation(activePeer, result.messages || []);
+      await loadThreads();
+    }catch(error){
+      dmConversation.textContent = error.message || '대화를 불러오지 못했어요.';
+    }
+  }
+
+  document.getElementById('school-dm-refresh').addEventListener('click', loadThreads);
+  loadRoster();
+  loadThreads();
+})();
+</script>
+</body>
+</html>

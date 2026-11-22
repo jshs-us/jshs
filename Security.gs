@@ -14,6 +14,7 @@ var Security = (function () {
       getUploadSignature: { limit: 20, windowSec: 3600 },
       createPostDirect: { limit: 10, windowSec: 600 },
       addComment: { limit: 20, windowSec: 300 },
+      sendDm: { limit: 30, windowSec: 60 },
       fineSubmitProof: { limit: 10, windowSec: 3600 },
       eggSubmitScore: { limit: 30, windowSec: 600 },
       _default: { limit: 120, windowSec: 60 }
@@ -255,7 +256,9 @@ var Security = (function () {
   function uploadSignature_(params, user) {
     var properties = properties_();
     var purpose = String(params.purpose || 'board');
-    if (purpose !== 'board' && purpose !== 'fine') return { success: false, message: '업로드 용도가 올바르지 않아요.' };
+    if (purpose !== 'board' && purpose !== 'fine' && purpose !== 'profile' && purpose !== 'dm') {
+      return { success: false, message: '업로드 용도가 올바르지 않아요.' };
+    }
     var prefix = 'CLOUDINARY_' + purpose.toUpperCase() + '_';
     var apiKey = properties.getProperty(prefix + 'API_KEY') || properties.getProperty('CLOUDINARY_API_KEY');
     var apiSecret = properties.getProperty(prefix + 'API_SECRET') || properties.getProperty('CLOUDINARY_API_SECRET');
@@ -263,7 +266,7 @@ var Security = (function () {
     if (!apiKey || !apiSecret || !cloud) {
       return { success: false, message: '업로드 설정이 아직 안 되어 있어요. 관리자에게 문의해주세요.' };
     }
-    if (purpose === 'board' && user.muted) {
+    if ((purpose === 'board' || purpose === 'dm') && user.muted) {
       return { success: false, message: '작성 금지 상태예요.', code: 'MUTED' };
     }
     var folder;
@@ -274,7 +277,7 @@ var Security = (function () {
       }
       folder = fineUploadFolder_(user.username, fineId);
     } else {
-      folder = userUploadFolder_('board', user.username);
+      folder = userUploadFolder_(purpose, user.username);
     }
     var publicId = Utilities.getUuid();
     var timestamp = nowSec_();
@@ -293,7 +296,7 @@ var Security = (function () {
       publicId: publicId,
       overwrite: false,
       signature: signature,
-      resourceType: purpose === 'fine' ? 'image' : 'auto'
+      resourceType: purpose === 'board' || purpose === 'dm' ? 'auto' : 'image'
     };
   }
 
@@ -325,7 +328,7 @@ var Security = (function () {
       if (CONFIG.FINE_ADMIN_ONLY.indexOf(action) >= 0 && CONFIG.FINE_ADMINS.indexOf(user.username) < 0) {
         return { ok: false, response: { success: false, message: '권한이 없어요.', code: 'FORBIDDEN' } };
       }
-      if (user.muted && (action === 'createPostDirect' || action === 'addComment')) {
+      if (user.muted && (action === 'createPostDirect' || action === 'addComment' || action === 'sendDm')) {
         return { ok: false, response: { success: false, message: '작성 금지 상태예요.', code: 'MUTED' } };
       }
       if (!isPublic) {

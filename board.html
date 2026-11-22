@@ -65,6 +65,9 @@
 #gwauri-board .post-item::before{content:"";position:absolute;left:0;top:18px;bottom:18px;width:4px;border-radius:4px;background:var(--yellow);opacity:0;transition:opacity .15s;}
 #gwauri-board .post-item:hover{border-color:var(--navy);box-shadow:0 4px 14px rgba(9,31,98,.08);}
 #gwauri-board .post-item:hover::before{opacity:1;}
+#gwauri-board .post-item-tools{display:flex;justify-content:flex-end;margin-top:12px;}
+#gwauri-board .post-item-delete{background:#fff;color:#b3432b;border:1px solid #f0c8c8;padding:7px 12px;font-size:13px;}
+#gwauri-board .post-item-delete:hover{background:#fff5f5;}
 #gwauri-board .post-title{font-size:20px;font-weight:700;margin:0 0 10px;color:var(--ink);}
 #gwauri-board .post-meta{font-size:15px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap;}
 #gwauri-board .post-meta span{display:inline-flex;align-items:center;gap:5px;}
@@ -150,7 +153,7 @@ const MAX_FILE_SIZE=50*1024*1024; // 1회 업로드 용량 상한(50MB). 실제 
 
 // ── 로그인 세션은 common.js(GwakuriAuth)에서 공유 ──────────────────
 const _session=(window.GwakuriAuth&&window.GwakuriAuth.getSession())||null;
-let S={user:_session?_session.username:null,role:_session?_session.role:null,muted:_session?!!_session.muted:false,view:"list",posts:[],currentPost:null,comments:[],selectedFile:null,uploading:false,adminUsers:[]};
+let S={user:_session?_session.username:null,role:_session?_session.role:null,muted:_session?!!_session.muted:false,view:"list",posts:[],currentPost:null,comments:[],selectedFile:null,uploading:false};
 
 const app=document.getElementById("gb-app"),userbar=document.getElementById("gb-userbar");
 function call(a,p){return window.GwakuriAuth.call(a,p);}
@@ -174,10 +177,22 @@ function render(){renderUserbar();if(S.view==="write")return rWrite();if(S.view=
 
 // List
 function rList(){
-  const lh=S.posts.length?`<ul class="post-list">${S.posts.map(p=>`<li class="post-item" data-id="${p.id}"><p class="post-title">${escH(p.title)}${p.fileUrl?" 📎":""}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👍 ${p.likes}</span><span>👁 ${p.views}</span></div></li>`).join("")}</ul>`:`<div class="empty">아직 등록된 글이 없어요.<br>첫 글을 남겨보세요.</div>`;
-  app.innerHTML=`<div class="gb-toolbar"><button class="btn-primary" id="gb-np">✏️ 글쓰기</button></div>${lh}`;
+  const canManage=S.role==="admin"||S.role==="manager";
+  const lh=S.posts.length?`<ul class="post-list">${S.posts.map(p=>`<li class="post-item" data-id="${escH(p.id)}"><p class="post-title">${escH(p.title)}${p.fileUrl?" 📎":""}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👍 ${p.likes}</span><span>👁 ${p.views}</span></div>${canManage?`<div class="post-item-tools"><button class="post-item-delete" type="button" data-delete-post="${escH(p.id)}">게시글 삭제</button></div>`:""}</li>`).join("")}</ul>`:`<div class="empty">아직 등록된 글이 없어요.<br>첫 글을 남겨보세요.</div>`;
+  app.innerHTML=`<div class="gb-toolbar">${canManage?'<span class="file-size-hint" style="margin-right:auto;align-self:center">관리 권한으로 게시글을 목록에서 관리할 수 있어요.</span>':""}<button class="btn-primary" id="gb-np">✏️ 글쓰기</button></div>${lh}`;
   document.getElementById("gb-np").onclick=()=>{if(!S.user)return;S.selectedFile=null;S.view="write";render();};
   app.querySelectorAll(".post-item").forEach(el=>el.onclick=()=>openPost(el.dataset.id));
+  app.querySelectorAll("[data-delete-post]").forEach(button=>button.onclick=async event=>{
+    event.stopPropagation();
+    if(!confirm("이 게시글을 삭제할까요?"))return;
+    button.disabled=true;
+    try{
+      const result=await call("adminDeletePost",{id:button.dataset.deletePost,actor:S.user});
+      if(!result.success)throw new Error(result.message||"게시글 삭제에 실패했어요.");
+      S.posts=S.posts.filter(post=>String(post.id)!==button.dataset.deletePost);
+      render();
+    }catch(error){alert(error.message||"게시글 삭제에 실패했어요.");button.disabled=false;}
+  });
 }
 
 // Write
@@ -247,13 +262,12 @@ async function uploadCloudinary(file,onP){
 
 // Detail
 function rDetail(){
-  const p=S.currentPost,cm=S.role==="admin"||S.role==="manager";
+  const p=S.currentPost;
   const att=p.fileUrl?(isImgUrl(p.fileUrl,p.fileName)?`<div class="detail-attachment"><img src="${escH(p.fileUrl)}" alt="첨부"/></div>`:`<div class="detail-attachment"><a class="file-link" href="${escH(p.fileUrl)}" target="_blank" rel="noopener">📎 ${escH(p.fileName||"첨부파일")} 열기</a></div>`):"";
-  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="detail-box"><p class="detail-title">${escH(p.title)}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👁 ${p.views}</span></div>${att}<div class="detail-content">${escH(p.content)}</div><div class="detail-actions"><button class="btn-ghost" id="gb-back2">목록으로</button><div style="display:flex;gap:8px">${cm?`<button class="btn-ghost danger-btn" id="gb-adel">🗑 삭제(관리)</button>`:""}<button class="like-btn" id="gb-like">👍 좋아요 ${p.likes}</button></div></div><div class="comments-section"><p class="comments-title">댓글</p><div id="gb-cl"><div class="loading">불러오는 중...</div></div>${S.user?(S.muted?`<div class="comment-empty">작성 제한 계정입니다.</div>`:`<div class="comment-form"><textarea id="gb-ci" placeholder="댓글을 입력하세요"></textarea><button class="btn-primary" id="gb-cs">등록</button></div>`):`<div class="comment-empty">댓글을 작성하려면 로그인해주세요.</div>`}</div></div>`;
+  app.innerHTML=`<button class="btn-ghost" id="gb-back" style="margin-bottom:14px">← 목록으로</button><div class="detail-box"><p class="detail-title">${escH(p.title)}</p><div class="post-meta"><span>${escH(p.author)}</span><span>${fmtD(p.createdAt)}</span><span>👁 ${p.views}</span></div>${att}<div class="detail-content">${escH(p.content)}</div><div class="detail-actions"><button class="btn-ghost" id="gb-back2">목록으로</button><div style="display:flex;gap:8px"><button class="like-btn" id="gb-like">👍 좋아요 ${p.likes}</button></div></div><div class="comments-section"><p class="comments-title">댓글</p><div id="gb-cl"><div class="loading">불러오는 중...</div></div>${S.user?(S.muted?`<div class="comment-empty">작성 제한 계정입니다.</div>`:`<div class="comment-form"><textarea id="gb-ci" placeholder="댓글을 입력하세요"></textarea><button class="btn-primary" id="gb-cs">등록</button></div>`):`<div class="comment-empty">댓글을 작성하려면 로그인해주세요.</div>`}</div></div>`;
   const bk=()=>{S.view="list";render();};
   document.getElementById("gb-back").onclick=bk;document.getElementById("gb-back2").onclick=bk;
   document.getElementById("gb-like").onclick=async()=>{if(!S.user)return;const r=await call("likePost",{id:p.id});if(r.success){p.likes=r.likes;rDetail();}};
-  const ad=document.getElementById("gb-adel");if(ad)ad.onclick=async()=>{if(!confirm("삭제할까요?"))return;const r=await call("adminDeletePost",{id:p.id,actor:S.user});if(r.success){S.view="list";await loadPosts();}else alert(r.message||"삭제 실패");};
   const cs=document.getElementById("gb-cs");if(cs)cs.onclick=async()=>{const ci=document.getElementById("gb-ci");const c=ci.value.trim();if(!c)return;cs.disabled=true;try{const r=await call("addComment",{postId:p.id,author:S.user,content:c});if(r.success){ci.value="";await loadCmts(p.id);}else alert(r.message||"댓글 등록 실패");}finally{cs.disabled=false;}};
   loadCmts(p.id);
 }

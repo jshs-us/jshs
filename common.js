@@ -72,6 +72,9 @@ body{
 .bw-nav-userwrap{display:flex;align-items:center;gap:10px;margin-left:8px;padding-left:14px;border-left:1px solid rgba(255,255,255,.18);}
 .bw-nav-username{color:rgba(255,255,255,.75);font-size:13px;white-space:nowrap;}
 .bw-nav-username b{color:#fff;}
+.bw-nav-profile{display:grid;place-items:center;width:34px;height:34px;border:1px solid rgba(255,255,255,.45);border-radius:50%;overflow:hidden;background:rgba(255,255,255,.14);color:#fff;text-decoration:none;font-size:14px;font-weight:800;}
+.bw-nav-profile img{width:100%;height:100%;object-fit:cover;}
+.bw-nav-profile:hover{outline:2px solid rgba(255,236,0,.7);}
 .bw-nav-logout{
   background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.32);
   border-radius:8px;padding:6px 13px;font-size:12.5px;font-weight:700;
@@ -231,7 +234,7 @@ body{
   // NAV
   const current = location.pathname.split('/').pop()||'index.html';
   const userBlock = session
-    ? `<li class="bw-nav-userwrap"><a href="mypage.html" ${current==='mypage.html'?'class="active"':''}>마이페이지</a><span class="bw-nav-username"><b>${escapeHtml(session.username)}</b>님</span><button class="bw-nav-logout" id="bw-logout-btn" type="button">로그아웃</button></li>`
+    ? `<li class="bw-nav-userwrap"><a class="bw-nav-profile" id="bw-nav-profile" href="mypage.html" aria-label="마이페이지 프로필">${session.profileImageUrl ? `<img src="${escapeAttribute(session.profileImageUrl)}" alt="프로필"/>` : escapeHtml(String(session.username || '?').trim().slice(0, 1) || '?')}</a><span class="bw-nav-username"><b>${escapeHtml(session.username)}</b>님</span><button class="bw-nav-logout" id="bw-logout-btn" type="button">로그아웃</button></li>`
     : '';
   const NAV = `
 <nav class="bw-nav">
@@ -245,7 +248,7 @@ body{
       <li><a href="meal.html"      ${current==='meal.html'?'class="active"':''}>급식</a></li>
       <li><a href="board.html" ${current==='board.html'?'class="active"':''}>게시판</a></li>
       <li><a href="fine.html" ${current==='fine.html'?'class="active"':''}>벌금</a></li>
-      <li><a href="admin.html"     ${current==='admin.html'?'class="active"':''}>관리자</a></li>
+      <li><a href="school.html"     ${current==='school.html'?'class="active"':''}>우리 학교</a></li>
       ${userBlock}
     </ul>
   </div>
@@ -269,6 +272,19 @@ body{
   // Logout
   const logoutBtn = document.getElementById('bw-logout-btn');
   if(logoutBtn) logoutBtn.addEventListener('click', logout);
+  const navProfile = document.getElementById('bw-nav-profile');
+  if(navProfile && !session.profileLoaded){
+    authCall('getMyInfo', {}).then(result=>{
+      if(!result || !result.success || !getSession()) return;
+      const currentSession = getSession();
+      currentSession.profileImageUrl = result.profileImageUrl || '';
+      currentSession.profileLoaded = true;
+      setSession(currentSession);
+      navProfile.innerHTML = currentSession.profileImageUrl
+        ? `<img src="${escapeAttribute(currentSession.profileImageUrl)}" alt="프로필"/>`
+        : escapeHtml(String(currentSession.username || '?').trim().slice(0, 1) || '?');
+    }).catch(()=>{});
+  }
 
   // ── LOGIN GATE ───────────────────────────────────────────────────
   if(!session){
@@ -283,6 +299,11 @@ body{
 
   function escapeHtml(str){
     const d=document.createElement('div'); d.textContent=String(str??''); return d.innerHTML;
+  }
+
+  function escapeAttribute(str){
+    return String(str??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
   function renderAuthGate(){
@@ -313,6 +334,7 @@ body{
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
           </div>
+          <input id="bw-student-id" type="text" maxlength="11" placeholder="학번 (예: 2026-1-2-03)" autocomplete="off" inputmode="numeric"/>
           <div class="bw-emailrow">
             <input id="bw-ae" type="email" placeholder="이메일" autocomplete="email"/>
             <button type="button" class="bw-mini" id="bw-send">인증번호 받기</button>
@@ -336,6 +358,7 @@ body{
     const passConfirmEl = wrap.querySelector('#bw-ap-confirm');
     const passToggle = wrap.querySelector('#bw-ap-toggle');
     const passConfirmToggle = wrap.querySelector('#bw-ap-confirm-toggle');
+    const studentIdEl = wrap.querySelector('#bw-student-id');
     const suBox = wrap.querySelector('#bw-su');
     const emailEl = wrap.querySelector('#bw-ae');
     const codeRow = wrap.querySelector('#bw-coderow');
@@ -411,6 +434,10 @@ body{
       if(!u || !p){ say('아이디와 비밀번호를 모두 입력해주세요.', 'err'); return; }
       if(mode==='signup' && p.length < 8){ say('비밀번호는 8자 이상 입력해주세요.', 'err'); return; }
       if(mode==='signup' && p !== passConfirmEl.value){ say('비밀번호가 서로 일치하지 않아요.', 'err'); return; }
+      if(mode==='signup' && !/^\d{4}-[1-3]-[1-4]-\d{2}$/.test(studentIdEl.value.trim())){
+        say('학번 형식은 2026-1-2-03처럼 입력해주세요. (1~3학년, 1~4반)', 'err');
+        return;
+      }
       if(mode==='signup' && (!emailProof || emailEl.value.trim().toLowerCase() !== verifiedEmail)){
         say('이메일 인증을 먼저 완료해주세요.', 'err');
         return;
@@ -423,6 +450,7 @@ body{
         if(action==='signup'){
           payload.email = emailEl.value.trim();
           payload.emailProof = emailProof;
+          payload.studentId = studentIdEl.value.trim();
         }
         const r = await authCall(action, payload);
         if(r.success){
@@ -437,7 +465,10 @@ body{
             setPasswordVisibility(passConfirmEl, passConfirmToggle, false);
             emailProof=''; verifiedEmail='';
           } else {
-            setSession({ username:r.username, role:r.role||'user', muted:!!r.muted, token:r.token||'', ts:Date.now() });
+            setSession({
+              username:r.username, role:r.role||'user', muted:!!r.muted, token:r.token||'', ts:Date.now(),
+              profileImageUrl:r.profileImageUrl||'', profileLoaded:true
+            });
             location.reload();
             return;
           }

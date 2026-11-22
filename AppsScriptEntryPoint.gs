@@ -5,7 +5,8 @@ const APP_TABLES = {
     name: '회원',
     headers: [
       'username', 'createdAt', 'role', 'muted', 'email', 'passwordSalt', 'passwordHash', 'isFounder',
-      'lastLoginAt', 'inactivityBaselineAt', 'inactivity3MonthNoticeAt', 'inactivity5MonthNoticeAt'
+      'lastLoginAt', 'inactivityBaselineAt', 'inactivity3MonthNoticeAt', 'inactivity5MonthNoticeAt',
+      'studentId', 'profileImageUrl'
     ],
     appendMissing: true
   },
@@ -35,6 +36,11 @@ const APP_TABLES = {
     name: '기기토큰',
     headers: ['username', 'token', 'platform', 'updatedAt']
   },
+  dms: {
+    name: 'DM',
+    headers: ['id', 'sender', 'recipient', 'content', 'createdAt', 'fileUrl', 'fileName'],
+    appendMissing: true
+  },
   eggs: {
     name: '이스터에그기록',
     headers: ['username', 'eggId', 'best', 'updatedAt'],
@@ -48,6 +54,7 @@ const PASSWORD_MIN_LENGTH = 8;
 const MAX_POST_TITLE = 120;
 const MAX_POST_CONTENT = 12000;
 const MAX_COMMENT_LENGTH = 2000;
+const MAX_DM_LENGTH = 2000;
 
 function doPost(e) {
   if (typeof Security === 'undefined' || typeof Security.wrap !== 'function') {
@@ -65,6 +72,10 @@ function doPost_original(e) {
     updateEmail: actionUpdateEmail_,
     changePassword: actionChangePassword_,
     getMyInfo: actionGetMyInfo_,
+    listSchoolStudents: actionListSchoolStudents_,
+    listDmThreads: actionListDmThreads_,
+    listDmConversation: actionListDmConversation_,
+    sendDm: actionSendDm_,
     listPosts: actionListPosts_,
     getPost: actionGetPost_,
     createPostDirect: actionCreatePost_,
@@ -78,6 +89,7 @@ function doPost_original(e) {
     setMuted: actionSetMuted_,
     resetPassword: actionResetPassword_,
     kickUser: actionKickUser_,
+    saveProfileImage: actionSaveProfileImage_,
     fineListMine: actionFineListMine_,
     fineListAll: actionFineListAll_,
     fineCreate: actionFineCreate_,
@@ -218,6 +230,7 @@ function isInactivityDeletionProtected_(member) {
 }
 
 function deleteInactiveMember_(member) {
+  deleteDmMessagesForMember_(member.username);
   tableRows_('devices').filter(function (row) {
     return sameName_(row.username, member.username);
   }).sort(function (a, b) { return b.__row - a.__row; }).forEach(function (row) {
@@ -618,6 +631,13 @@ function findMemberByEmail_(email) {
   }) || null;
 }
 
+function findMemberByStudentId_(studentId) {
+  const target = String(studentId || '').trim();
+  return tableRows_('members').find(function (row) {
+    return String(row.studentId || '').trim() === target;
+  }) || null;
+}
+
 function memberForSecurity_(username) {
   const row = findMember_(username);
   if (!row) return null;
@@ -789,6 +809,10 @@ function randomPassword_() {
 function actionSignup_(p) {
   const username = requiredText_(p.username, '아이디', 30);
   if (!/^[가-힣A-Za-z0-9._ -]{2,30}$/.test(username)) throw new Error('아이디는 한글, 영문, 숫자, 공백, ., _, -만 사용할 수 있어요.');
+  const studentId = requiredText_(p.studentId, '학번', 11);
+  if (!/^\d{4}-[1-3]-[1-4]-\d{2}$/.test(studentId)) {
+    throw new Error('학번 형식은 2026-1-2-03처럼 입력해주세요. (1~3학년, 1~4반)');
+  }
   const password = String(p.password || '');
   if (password.length < PASSWORD_MIN_LENGTH || password.length > 128) {
     throw new Error('비밀번호는 8자 이상 128자 이하로 입력해주세요.');
@@ -799,6 +823,7 @@ function actionSignup_(p) {
   const hash = passwordHash_(password, salt);
   return withWriteLock_(function () {
     if (findMember_(username)) throw new Error('이미 사용 중인 아이디예요.');
+    if (findMemberByStudentId_(studentId)) throw new Error('이미 등록된 학번이에요.');
     if (emailInUse_(email, '')) throw new Error('이미 다른 계정에서 쓰는 이메일이에요.');
     if (!Security.consumeEmailProof(p.emailProof, email, 'signup', '')) {
       throw new Error('이메일 인증이 만료됐어요. 다시 인증해주세요.');
@@ -806,7 +831,7 @@ function actionSignup_(p) {
     const sheet = table_('members');
     const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getDisplayValues()[0];
     const values = {
-      username: username, role: 'user', muted: false, email: email,
+      username: username, studentId: studentId, role: 'user', muted: false, email: email,
       passwordSalt: salt, passwordHash: hash, createdAt: nowIso_(), isFounder: false
     };
     appendRow_(sheet, headers.map(function (header) { return values[header] == null ? '' : values[header]; }));
@@ -850,8 +875,10 @@ function actionLogin_(p) {
     return {
       success: true,
       username: String(latest.username || ''),
+      studentId: String(latest.studentId || ''),
       role: normalizeRole_(latest.role),
-      muted: truthy_(latest.muted)
+      muted: truthy_(latest.muted),
+      profileImageUrl: String(latest.profileImageUrl || '')
     };
   });
 }
@@ -895,12 +922,170 @@ function actionGetMyInfo_(p) {
   return {
     success: true,
     username: String(member.username),
+    studentId: String(member.studentId || ''),
     role: normalizeRole_(member.role),
     muted: truthy_(member.muted),
     email: String(member.email || ''),
+    profileImageUrl: String(member.profileImageUrl || ''),
     postCount: posts,
     commentCount: comments
   };
+}
+
+function actionListSchoolStudents_() {
+  const classes = [];
+  const classIndex = {};
+  for (let grade = 1; grade <= 3; grade++) {
+    for (let classNumber = 1; classNumber <= 4; classNumber++) {
+      const item = { grade: grade, classNumber: classNumber, students: [] };
+      classes.push(item);
+      classIndex[grade + '-' + classNumber] = item;
+    }
+  }
+  const unassigned = [];
+  tableRows_('members').forEach(function (row) {
+    const username = String(row.username || '').trim();
+    if (!username) return;
+    const studentId = String(row.studentId || '').trim();
+    const match = /^(\d{4})-([1-3])-([1-4])-(\d{2})$/.exec(studentId);
+    const student = {
+      username: username,
+      studentId: studentId,
+      profileImageUrl: cloudinaryUrl_(row.profileImageUrl, userUploadFolder_('profile', username), 'image')
+        ? String(row.profileImageUrl) : ''
+    };
+    if (match) {
+      classIndex[match[2] + '-' + match[3]].students.push(student);
+    } else {
+      unassigned.push(student);
+    }
+  });
+  classes.forEach(function (item) {
+    item.students.sort(function (a, b) { return a.studentId.localeCompare(b.studentId); });
+  });
+  unassigned.sort(function (a, b) {
+    return a.studentId.localeCompare(b.studentId) || a.username.localeCompare(b.username);
+  });
+  return { success: true, classes: classes, unassigned: unassigned };
+}
+
+function dmMessageObject_(row, username) {
+  return {
+    id: String(row.id),
+    sender: String(row.sender || ''),
+    recipient: String(row.recipient || ''),
+    content: String(row.content || ''),
+    createdAt: row.createdAt,
+    fileUrl: String(row.fileUrl || ''),
+    fileName: String(row.fileName || ''),
+    fromMe: sameName_(row.sender, username)
+  };
+}
+
+function actionListDmThreads_(p) {
+  const username = requiredText_(p.username, '회원', 30);
+  const threadsByPeer = {};
+  tableRows_('dms').forEach(function (row) {
+    const sentByMe = sameName_(row.sender, username);
+    const receivedByMe = sameName_(row.recipient, username);
+    if (!sentByMe && !receivedByMe) return;
+    const peerUsername = sentByMe ? String(row.recipient || '') : String(row.sender || '');
+    const key = peerUsername.toLowerCase();
+    if (!key) return;
+    let thread = threadsByPeer[key];
+    if (!thread) {
+      thread = threadsByPeer[key] = {
+        peerUsername: peerUsername, lastMessage: '', lastMessageAt: ''
+      };
+    }
+    if (!thread.lastMessageAt || new Date(row.createdAt).getTime() >= new Date(thread.lastMessageAt).getTime()) {
+      thread.peerUsername = peerUsername;
+      thread.lastMessage = String(row.content || '') || (row.fileName ? '📎 ' + String(row.fileName) : '첨부 파일');
+      thread.lastMessageAt = row.createdAt;
+    }
+  });
+  const threads = Object.keys(threadsByPeer).map(function (key) { return threadsByPeer[key]; })
+    .sort(function (a, b) { return new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(); });
+  return { success: true, threads: threads };
+}
+
+function actionListDmConversation_(p) {
+  const username = requiredText_(p.username, '회원', 30);
+  const peerName = requiredText_(p.peerUsername, '대화 상대', 30);
+  if (sameName_(username, peerName)) throw new Error('자기 자신과는 대화할 수 없어요.');
+  const peer = findMember_(peerName);
+  if (!peer) throw new Error('대화 상대 회원을 찾을 수 없어요.');
+  const messages = tableRows_('dms').filter(function (row) {
+    return sameName_(row.sender, username) && sameName_(row.recipient, peer.username) ||
+      sameName_(row.sender, peer.username) && sameName_(row.recipient, username);
+  }).sort(function (a, b) { return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(); });
+  return {
+    success: true,
+    peerUsername: String(peer.username),
+    messages: messages.map(function (row) { return dmMessageObject_(row, username); })
+  });
+}
+
+function actionSendDm_(p) {
+  const sender = requiredText_(p.username, '회원', 30);
+  const recipientName = requiredText_(p.recipientUsername, '받는 사람', 30);
+  const content = text_(p.content, MAX_DM_LENGTH);
+  const fileUrl = text_(p.fileUrl, 1000);
+  const fileName = text_(p.fileName, 255);
+  if (!content && !fileUrl) throw new Error('메시지나 첨부파일을 입력해주세요.');
+  if (!!fileUrl !== !!fileName) throw new Error('첨부파일 정보를 확인할 수 없어요.');
+  if (fileUrl && !cloudinaryUrl_(fileUrl, userUploadFolder_('dm', sender), 'any')) {
+    throw new Error('허용되지 않은 첨부파일 주소예요.');
+  }
+  if (sameName_(sender, recipientName)) throw new Error('자기 자신에게는 메시지를 보낼 수 없어요.');
+  return withWriteLock_(function () {
+    if (!findMember_(sender)) throw new Error('회원 정보를 찾을 수 없어요.');
+    const recipient = findMember_(recipientName);
+    if (!recipient) throw new Error('받는 사람 회원을 찾을 수 없어요.');
+    const message = {
+      id: newId_(), sender: sender, recipient: String(recipient.username),
+      content: content, createdAt: nowIso_(), fileUrl: fileUrl, fileName: fileName
+    };
+    appendRecord_('dms', message);
+    return { success: true, message: dmMessageObject_(message, sender) };
+  });
+}
+
+function deleteDmMessagesForMember_(username) {
+  const sheet = table_('dms');
+  const rows = tableRows_('dms').filter(function (row) {
+    return sameName_(row.sender, username) || sameName_(row.recipient, username);
+  });
+  if (!rows.length) return;
+  rows.sort(function (a, b) { return b.__row - a.__row; });
+  let start = rows[0].__row;
+  let count = 1;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].__row === start - 1) {
+      start = rows[i].__row;
+      count++;
+    } else {
+      sheet.deleteRows(start, count);
+      start = rows[i].__row;
+      count = 1;
+    }
+  }
+  sheet.deleteRows(start, count);
+}
+
+function actionSaveProfileImage_(p) {
+  const profileImageUrl = text_(p.profileImageUrl, 1000);
+  const member = findMember_(p.username);
+  if (!member) throw new Error('회원 정보를 찾을 수 없어요.');
+  if (profileImageUrl && !cloudinaryUrl_(profileImageUrl, userUploadFolder_('profile', member.username), 'image')) {
+    throw new Error('본인 프로필용 Cloudinary 이미지 주소만 사용할 수 있어요.');
+  }
+  return withWriteLock_(function () {
+    const latest = findMember_(member.username);
+    if (!latest) throw new Error('회원 정보를 찾을 수 없어요.');
+    setByHeader_(table_('members'), latest.__row, 'profileImageUrl', profileImageUrl);
+    return { success: true, profileImageUrl: profileImageUrl };
+  });
 }
 
 function postObject_(row) {
@@ -953,7 +1138,9 @@ function actionGetPost_(p) {
 function cloudinaryUrl_(value, folder, resourceType) {
   const url = String(value || '');
   const properties = PropertiesService.getScriptProperties();
-  const purpose = folder.indexOf('gwakuri-fine/') === 0 ? 'FINE' : 'BOARD';
+  const purpose = folder.indexOf('gwakuri-fine/') === 0 ? 'FINE'
+    : folder.indexOf('gwakuri-profile/') === 0 ? 'PROFILE'
+    : folder.indexOf('gwakuri-dm/') === 0 ? 'DM' : 'BOARD';
   const cloud = String(properties.getProperty('CLOUDINARY_' + purpose + '_CLOUD_NAME') ||
     properties.getProperty('CLOUDINARY_CLOUD_NAME') || '');
   if (!cloud) return false;
@@ -1085,12 +1272,16 @@ function actionListUsers_() {
     users: tableRows_('members').map(function (row) {
       return {
         username: String(row.username || ''),
+        studentId: String(row.studentId || ''),
         role: normalizeRole_(row.role),
         muted: truthy_(row.muted),
         createdAt: row.createdAt || '',
         isFounder: truthy_(row.isFounder)
       };
-    }).sort(function (a, b) { return a.username.localeCompare(b.username); })
+    }).sort(function (a, b) {
+      return String(a.studentId || '9999-9-9-99').localeCompare(String(b.studentId || '9999-9-9-99')) ||
+        a.username.localeCompare(b.username);
+    })
   };
 }
 
@@ -1151,6 +1342,7 @@ function actionKickUser_(p) {
       tableRows_('members').filter(function (row) { return normalizeRole_(row.role) === 'admin'; }).length <= 1) {
       throw new Error('마지막 관리자는 탈퇴 처리할 수 없어요.');
     }
+    deleteDmMessagesForMember_(member.username);
     tableRows_('devices').filter(function (row) {
       return sameName_(row.username, member.username);
     }).sort(function (a, b) { return b.__row - a.__row; }).forEach(function (row) {
